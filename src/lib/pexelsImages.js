@@ -6,13 +6,54 @@ export function isPexelsConfigured() {
   return Boolean(import.meta.env.VITE_PEXELS_API_KEY?.trim());
 }
 
+function pickPhotoSrc(photo) {
+  if (!photo?.src) return null;
+  const s = photo.src;
+  return (
+    s.large2x ||
+    s.large ||
+    s.medium ||
+    s.small ||
+    s.tiny ||
+    s.portrait ||
+    s.landscape ||
+    null
+  );
+}
+
+/**
+ * @param {string} query
+ * @param {string | null} orientation landscape | portrait | square | null (any)
+ * @param {string} apiKey
+ * @returns {Promise<string | null>}
+ */
+async function searchPexelsOnce(query, orientation, apiKey) {
+  const q = query.replace(/\s+/g, " ").trim().slice(0, 100);
+  if (!q) return null;
+
+  const params = new URLSearchParams({ query: q, per_page: "8" });
+  if (orientation) params.set("orientation", orientation);
+
+  const res = await fetch(`https://api.pexels.com/v1/search?${params}`, {
+    headers: { Authorization: apiKey },
+  });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  for (const photo of data.photos ?? []) {
+    const src = pickPhotoSrc(photo);
+    if (src) return src;
+  }
+  return null;
+}
+
 /**
  * @param {string} query
  * @returns {Promise<string | null>}
  */
 export async function fetchPexelsImageUrl(query) {
-  const key = import.meta.env.VITE_PEXELS_API_KEY?.trim();
-  if (!key) return null;
+  const apiKey = import.meta.env.VITE_PEXELS_API_KEY?.trim();
+  if (!apiKey) return null;
 
   const q = query.replace(/\s+/g, " ").trim().slice(0, 100);
   if (!q) return null;
@@ -20,20 +61,21 @@ export async function fetchPexelsImageUrl(query) {
   const cached = cache.get(q);
   if (cached) return cached;
 
-  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=landscape`;
-  const res = await fetch(url, {
-    headers: { Authorization: key },
-  });
-  if (!res.ok) return null;
+  const words = q.split(/\s+/).filter(Boolean);
+  const short =
+    words.slice(0, 3).join(" ") || "gift";
 
-  const data = await res.json();
-  const photo = data.photos?.[0];
-  const src =
-    photo?.src?.large2x ||
-    photo?.src?.large ||
-    photo?.src?.medium ||
-    null;
+  try {
+    let src =
+      (await searchPexelsOnce(q, "landscape", apiKey)) ||
+      (await searchPexelsOnce(q, null, apiKey)) ||
+      (await searchPexelsOnce(`${short} gift`, "landscape", apiKey)) ||
+      (await searchPexelsOnce(short, null, apiKey)) ||
+      (await searchPexelsOnce("gift present celebration", "landscape", apiKey));
 
-  if (src) cache.set(q, src);
-  return src;
+    if (src) cache.set(q, src);
+    return src;
+  } catch {
+    return null;
+  }
 }

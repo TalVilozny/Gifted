@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import GiftedIcon from "./Icons/GiftedIcon.png";
+import GiftedLogo from "./Icons/GiftedLogo.png";
 import {
   CURRENCIES,
+  DEFAULT_GIFT_IMAGE_URL,
   getRecommendations,
   hobbies,
   inferHobbyIdsFromCustomLabels,
@@ -74,6 +77,18 @@ const AGE_RANGES = [
   { id: "60+", label: "Senior", hint: "60+" },
 ];
 
+/** Age bands shown for “who” — parents aren’t children/teens; partners aren’t children. */
+function ageRangesForRecipient(recipientId) {
+  if (!recipientId) return AGE_RANGES;
+  if (recipientId === "mom" || recipientId === "dad") {
+    return AGE_RANGES.filter((a) => a.id !== "0-12" && a.id !== "13-17");
+  }
+  if (recipientId === "boyfriend" || recipientId === "girlfriend") {
+    return AGE_RANGES.filter((a) => a.id !== "0-12");
+  }
+  return AGE_RANGES;
+}
+
 /** @param {string | null} id */
 function recipientIdToGender(id) {
   switch (id) {
@@ -122,28 +137,225 @@ function recipientRecapLabel(id) {
   }
 }
 
+/** @param {string} s */
+function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+const REFINE_STOP = new Set([
+  "the",
+  "a",
+  "an",
+  "for",
+  "and",
+  "with",
+  "from",
+  "new",
+  "pro",
+  "plus",
+  "mini",
+  "set",
+  "pack",
+  "gift",
+  "edition",
+]);
+
+const REFINE_PLACEHOLDER_BY_HOBBY = {
+  gaming: [
+    "physical edition, not digital only",
+    "matching controller color",
+    "collector's art or standard box",
+    "gift wrap or digital code",
+  ],
+  fitness: [
+    "foam roller — firm density",
+    "resistance bands full set",
+    "extra thick yoga mat",
+    "adjustable dumbbells pair",
+  ],
+  reading: [
+    "hardcover gift edition",
+    "large print if available",
+    "audiobook add-on",
+    "boxed set or single volume",
+  ],
+  coffee: [
+    "dark roast whole bean",
+    "electric burr grinder",
+    "pour-over dripper size 2",
+    "travel mug leakproof",
+  ],
+  music: [
+    "noise cancelling over-ear",
+    "open-back for home listening",
+    "wired studio use",
+    "limited vinyl colorway",
+  ],
+  crafts: [
+    "beginner-friendly kit",
+    "natural fiber yarn",
+    "left-handed scissors",
+    "gift box add-on",
+  ],
+  photo: [
+    "50mm prime lens",
+    "carbon fiber tripod",
+    "SD card 128GB+",
+    "mirrorless not DSLR",
+  ],
+  cooking: [
+    "oven-safe nonstick",
+    "carbon steel wok",
+    "chef's knife 8 inch",
+    "cast iron preseasoned",
+  ],
+  travel: [
+    "carry-on size only",
+    "packing cubes set",
+    "TSA-friendly lock",
+    "RFID passport wallet",
+  ],
+  design: [
+    "A5 grid notebook",
+    "minimal desk mat",
+    "font pack for print",
+    "matte not glossy paper",
+  ],
+  garden: [
+    "indoor herb starter",
+    "ceramic planters medium",
+    "ergonomic pruning shears",
+    "heirloom seed mix",
+  ],
+  style: [
+    "wool blend, neutral tone",
+    "travel size set",
+    "silver-tone hardware",
+    "unscented option",
+  ],
+  cars: [
+    "front + rear dash cam",
+    "microfiber detailing kit",
+    "OBD2 Bluetooth reader",
+    "all-weather floor mats",
+  ],
+  makeup: [
+    "warm undertone shades",
+    "matte not dewy finish",
+    "travel minis",
+    "vegan or cruelty-free",
+  ],
+  pcbuilding: [
+    "750W gold PSU",
+    "32GB RAM kit",
+    "mesh case airflow",
+    "RGB off, minimal lighting",
+  ],
+  luxury: [
+    "engraving or monogram",
+    "appointment or experience",
+    "signature scent notes",
+    "presentation gift box",
+  ],
+  general: [
+    "smaller size if available",
+    "under $X budget",
+    "gift receipt friendly",
+    "eco packaging",
+  ],
+};
+
+/** First distinctive word from a product title to personalize refine hints. */
+function firstSignificantProductWord(name) {
+  if (!name || typeof name !== "string") return "";
+  const parts = name.split(/\s+/);
+  for (const raw of parts) {
+    const word = raw.replace(/[^\w]/g, "");
+    if (word.length > 2 && !REFINE_STOP.has(word.toLowerCase())) {
+      return word.length > 22 ? `${word.slice(0, 22)}…` : word;
+    }
+  }
+  return "";
+}
+
+/**
+ * Placeholder for “Be more specific” — varies by hobby, product, and gift id.
+ * @param {{ id: string, _sourceHobbyId?: string, categoryTitle?: string }} gift
+ * @param {{ name?: string }} product
+ */
+function refinePlaceholderForGift(gift, product) {
+  const hid = gift._sourceHobbyId;
+  const pool =
+    REFINE_PLACEHOLDER_BY_HOBBY[hid] ?? REFINE_PLACEHOLDER_BY_HOBBY.general;
+  const seed = hashString(`${gift.id}|${product.name ?? ""}|${gift.categoryTitle ?? ""}`);
+  const line = pool[seed % pool.length];
+
+  const word = firstSignificantProductWord(product.name ?? "");
+  const useWord = word && seed % 3 !== 0;
+  if (useWord) {
+    const combined = `${word} — ${line}`;
+    if (combined.length <= 58) {
+      return `e.g. "${combined}"`;
+    }
+  }
+
+  const cat = (gift.categoryTitle || "").trim();
+  if (cat && seed % 3 === 0 && cat.length <= 28) {
+    const withCat = `${cat}: ${line}`;
+    if (withCat.length <= 58) {
+      return `e.g. "${withCat}"`;
+    }
+  }
+
+  return `e.g. "${line}"`;
+}
+
 function ProductImage({ searchQuery, fallbackSrc }) {
-  const [src, setSrc] = useState(fallbackSrc);
+  const safeFallback = fallbackSrc || DEFAULT_GIFT_IMAGE_URL;
+  const fallbackRef = useRef(safeFallback);
+  fallbackRef.current = safeFallback;
+
+  const [src, setSrc] = useState(safeFallback);
+  const loadGenRef = useRef(0);
 
   useEffect(() => {
-    setSrc(fallbackSrc);
+    const gen = ++loadGenRef.current;
+    setSrc(safeFallback);
     if (!isPexelsConfigured()) return;
     let cancelled = false;
-    fetchPexelsImageUrl(searchQuery).then((url) => {
-      if (!cancelled && url) setSrc(url);
-    });
+    fetchPexelsImageUrl(searchQuery)
+      .then((url) => {
+        if (!cancelled && gen === loadGenRef.current && url) setSrc(url);
+      })
+      .catch(() => {
+        /* keep catalog fallback */
+      });
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, fallbackSrc]);
+  }, [searchQuery, safeFallback]);
+
+  function handleImgError() {
+    setSrc((prev) => {
+      const fb = fallbackRef.current;
+      if (prev !== fb) return fb;
+      if (fb !== DEFAULT_GIFT_IMAGE_URL) return DEFAULT_GIFT_IMAGE_URL;
+      return prev;
+    });
+  }
 
   return (
     <img
       className="GiftCard__img"
-      src={src}
+      src={src || DEFAULT_GIFT_IMAGE_URL}
       alt=""
       loading="lazy"
       decoding="async"
+      onError={handleImgError}
     />
   );
 }
@@ -276,8 +488,14 @@ export default function App() {
 
   function pickRecipient(id) {
     setRecipientId(id);
+    setRecipientAgeRange(null);
     setStep("age");
   }
+
+  const ageRangeChoices = useMemo(
+    () => ageRangesForRecipient(recipientId),
+    [recipientId],
+  );
 
   function goAge(ageId) {
     setRecipientAgeRange(ageId);
@@ -485,7 +703,7 @@ export default function App() {
           setRefineErrorByGiftId((prev) => ({
             ...prev,
             [gift.id]:
-              "AI returned an unknown product id; used on-device matching instead.",
+              "That response didn’t match a product on this card; used on-device matching instead.",
           }));
         }
       } else {
@@ -496,9 +714,7 @@ export default function App() {
       const detail = err?.message ? ` (${err.message})` : "";
       setRefineErrorByGiftId((prev) => ({
         ...prev,
-        [gift.id]: groqReady
-          ? `Groq error${detail} — used on-device matching instead.`
-          : "Set VITE_GROQ_API_KEY for AI refine; used on-device matching.",
+        [gift.id]: `Refine didn’t complete${detail} — used on-device matching instead.`,
       }));
     } finally {
       setRefiningId(null);
@@ -559,15 +775,18 @@ export default function App() {
     <div className="Shell">
       <div className="Shell__glow" aria-hidden />
       <header className="Header">
-        <div className="Header__brand">
-          <span className="Header__mark" aria-hidden>
-            ◈
-          </span>
-          <div>
-            <h1 className="Header__title">GiftPicker</h1>
-            <p className="Header__tagline">Thoughtful gifts, distilled</p>
+        <button
+          type="button"
+          className="GiftedLogo GiftedLogo--home"
+          onClick={restart}
+          aria-label="Start over"
+        >
+          <img src={GiftedIcon} alt="" className="GiftedIcon" />
+          <div className="GiftedText">
+            <img src={GiftedLogo} alt="Gifted" />
+            <h3>Gifting, made effortless</h3>
           </div>
-        </div>
+        </button>
         {step !== "who" && step !== "thinking" && (
           <button type="button" className="Btn Btn--ghost" onClick={restart}>
             Start over
@@ -633,11 +852,11 @@ export default function App() {
               How old are they?
             </h2>
             <p className="Panel__lead">
-              Rough age helps GiftPicker and Groq match tone, hobbies, and
-              price—pick the closest band.
+              Rough age helps GiftPicker match tone, hobbies, and price—pick the
+              closest band.
             </p>
             <div className="ChoiceRow ChoiceRow--age">
-              {AGE_RANGES.map((a) => (
+              {ageRangeChoices.map((a) => (
                 <button
                   key={a.id}
                   type="button"
@@ -785,9 +1004,10 @@ export default function App() {
               </label>
               {wantDIY && (
                 <p className="DIYToggle__hint">
-                  {groqReady
-                    ? "Groq will prioritize things they create or personalize: origami sets, custom or build-your-own bouquets, handwritten or calligraphy love letters, paper crafts, keepsakes—sentimental handmade gifts, not just tool kits."
-                    : "We’ll lean toward handmade and personalized projects (paper, florals, letters) that match your hobbies and budget below."}
+                  We’ll prioritize things they create or personalize: origami
+                  sets, custom or build-your-own bouquets, handwritten or
+                  calligraphy love letters, paper crafts, keepsakes—sentimental
+                  handmade gifts, not just tool kits.
                 </p>
               )}
             </div>
@@ -883,7 +1103,8 @@ export default function App() {
               <span>
                 <strong>Endless budget</strong> — no cap on spend (above the ~
                 {BUDGET_MAX_USD.toLocaleString()} USD slider max). Use this for
-                premium or high-ticket gifts; Groq scales ideas accordingly.
+                premium or high-ticket gifts; suggestions skew toward higher-end
+                picks.
               </span>
             </label>
 
@@ -987,7 +1208,7 @@ export default function App() {
             <h2 className="Thinking__title">Finding the best fit…</h2>
             <p className="Thinking__text">
               {groqReady
-                ? "Groq is inventing personalized gift ideas from your hobbies"
+                ? "Creating personalized gift ideas from your hobbies"
                 : "Scoring gifts from our catalog for your hobbies and budget"}{" "}
               in{" "}
               {CURRENCIES.find((c) => c.code === currency)?.label ?? currency}.
@@ -1030,7 +1251,7 @@ export default function App() {
                 const links = getRetailerLinks(product.name, countryCode);
                 const multi = gift.variants.length > 1;
                 const refining = refiningId === gift.id;
-                const refineLabel = groqReady ? "Refine with Groq" : "Refine";
+                const refineLabel = "Refine";
                 return (
                   <li
                     key={gift.id}
@@ -1047,7 +1268,6 @@ export default function App() {
                       {gift.categoryTitle && (
                         <p className="GiftCard__category">
                           {gift.categoryTitle}
-                          {gift._aiGenerated ? " · AI-suggested" : ""}
                         </p>
                       )}
                       <div className="GiftCard__head">
@@ -1079,7 +1299,7 @@ export default function App() {
                         </button>
                         <p className="GiftCard__wantHint">
                           {groqReady
-                            ? "Opens the search Groq thinks is best for price & availability in your region."
+                            ? "Opens a shopping search picked for your region (smart routing when available)."
                             : "Opens Google Shopping to compare prices across stores."}
                         </p>
                         {wantThisErrorByGiftId[gift.id] && (
@@ -1111,7 +1331,7 @@ export default function App() {
                             <input
                               id={`refine-${gift.id}`}
                               className="Input Input--compact"
-                              placeholder='e.g. "RGB lights and wireless"'
+                              placeholder={refinePlaceholderForGift(gift, product)}
                               value={refineByGiftId[gift.id] ?? ""}
                               onChange={(e) =>
                                 setRefineByGiftId((prev) => ({
@@ -1141,13 +1361,13 @@ export default function App() {
                           <p className="RefineBlock__hint">
                             {groqReady
                               ? result.source === "groq"
-                                ? "Groq picks the variant on this card that best matches your note (or keyword matching if the API is unavailable)."
-                                : "Groq reads your note and chooses the best option from this card’s catalog list."
-                              : "On-device keyword matching; add VITE_GROQ_API_KEY for Groq-powered picks."}
+                                ? "Picks the variant on this card that best matches your note (or keyword matching if smart refine isn’t available)."
+                                : "Reads your note and chooses the best option from this card’s catalog list."
+                              : "On-device keyword matching picks a variant from this list."}
                           </p>
                           {groqNoteByGiftId[gift.id] && (
                             <p className="RefineBlock__aiNote">
-                              <strong>Groq:</strong> {groqNoteByGiftId[gift.id]}
+                              <strong>Note:</strong> {groqNoteByGiftId[gift.id]}
                             </p>
                           )}
                           {refineErrorByGiftId[gift.id] && (

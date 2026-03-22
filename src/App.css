@@ -461,7 +461,9 @@ h4 {
   color: #e4e4e7;
   cursor: pointer;
   user-select: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .BudgetUnlimited:hover {
@@ -1152,6 +1154,63 @@ h4 {
     opacity: 1;
     transform: none;
   }
+}
+
+.GiftedLogo {
+  display: flex;
+  gap: 15px;
+
+  align-items: center;
+}
+
+.GiftedLogo--home {
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.GiftedLogo--home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.GiftedLogo--home:hover {
+  opacity: 0.92;
+}
+
+.GiftedIcon {
+  width: 60px;
+  height: 60px;
+}
+
+.GiftedText img {
+  height: 25px;
+  width: fit-content;
+  filter: brightness(0) invert(1);
+}
+
+.GiftedText {
+  margin-top: 5px;
+  display: flex;
+  gap: 5px;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.GiftedText h3 {
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1; /* Aligns line box to font size */
+  display: inline-block;
+  color: #a1a1aa;
+  font-weight: 200;
 }
 
 @media (max-width: 720px) {

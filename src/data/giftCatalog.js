@@ -1588,18 +1588,23 @@ const HOBBY_IMAGES = {
   ],
 };
 
+/** Last-resort image when catalog/Pexels URLs fail in the browser. */
+export const DEFAULT_GIFT_IMAGE_URL = HOBBY_IMAGES.general[0];
+
 /**
  * @param {{ id: string, image?: string }} gift
- * @param {string} sourceHobbyId
+ * @param {string} [sourceHobbyId]
  */
 export function resolveGiftImage(gift, sourceHobbyId) {
-  if (gift.image) return gift.image;
+  if (gift?.image) return gift.image;
   const pool = HOBBY_IMAGES[sourceHobbyId] ?? HOBBY_IMAGES.general;
+  const list = pool?.length ? pool : [DEFAULT_GIFT_IMAGE_URL];
+  const id = gift?.id ?? "";
   let h = 0;
-  for (let i = 0; i < gift.id.length; i++) {
-    h = (h * 31 + gift.id.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < id.length; i++) {
+    h = (h * 31 + id.charCodeAt(i)) >>> 0;
   }
-  return pool[h % pool.length];
+  return list[h % list.length];
 }
 
 /**
