@@ -90,14 +90,6 @@ export const hobbies = [
     emoji: "🍳",
   },
   {
-    id: "travel",
-    title: "Wanderlust",
-    subtitle: "Maps, packing cubes, and new coordinates",
-    cardGradient:
-      "linear-gradient(145deg, rgba(6, 182, 212, 0.18), rgba(5, 150, 105, 0.12))",
-    emoji: "🧭",
-  },
-  {
     id: "design",
     title: "Form & function",
     subtitle: "Typography, objects, and quiet taste",
@@ -148,6 +140,15 @@ export const hobbies = [
       "linear-gradient(145deg, rgba(14, 165, 233, 0.2), rgba(99, 102, 241, 0.14))",
     emoji: "🖥️",
     forGender: "male",
+  },
+  {
+    id: "kids",
+    title: "Kids & play",
+    subtitle: "Toys, games, creativity, and wonder",
+    cardGradient:
+      "linear-gradient(145deg, rgba(251, 191, 36, 0.22), rgba(244, 114, 182, 0.14))",
+    emoji: "🧸",
+    forGender: null,
   },
 ];
 
@@ -1447,6 +1448,97 @@ export const giftsByHobby = {
       ],
     },
   ],
+  kids: [
+    {
+      id: "kd1",
+      categoryTitle: "Creative play",
+      forGender: null,
+      variants: [
+        {
+          id: "kd1-lego",
+          name: "LEGO Creator 3-in-1 building set (medium)",
+          priceUSD: 48,
+          rating: 4.9,
+          tags: ["building", "creative", "STEM", "kids"],
+          blurb:
+            "Hours of focused play; they can rebuild into different models.",
+          reviews: [
+            R("Instructions are clear; we built together on day one.", "Sam T.", 5),
+            R("Box is gift-ready with a fun print.", "Priya L.", 5),
+          ],
+        },
+        {
+          id: "kd1-art",
+          name: "Washable watercolor set + thick paper pad",
+          priceUSD: 32,
+          rating: 4.7,
+          tags: ["art", "painting", "kids"],
+          blurb: "Mess-friendly colors; great for rainy afternoons.",
+          reviews: [
+            R("Pigments wash out of the table—miracle.", "Alex R.", 5),
+            R("Paper is thick enough for wet washes.", "Jordan K.", 4),
+          ],
+        },
+      ],
+    },
+    {
+      id: "kd2",
+      categoryTitle: "Outdoor & active",
+      forGender: null,
+      variants: [
+        {
+          id: "kd2-scooter",
+          name: "Kids’ adjustable kick scooter (LED wheels)",
+          priceUSD: 65,
+          rating: 4.8,
+          tags: ["outdoor", "scooter", "active"],
+          blurb: "Grows with them; smooth ride on sidewalks.",
+          reviews: [
+            R("Assembly took 10 minutes; brakes feel solid.", "Chris P.", 5),
+            R("Lights are a hit at dusk.", "Morgan D.", 5),
+          ],
+        },
+        {
+          id: "kd2-bubbles",
+          name: "Giant bubble wand kit + concentrate",
+          priceUSD: 22,
+          rating: 4.6,
+          tags: ["outdoor", "play"],
+          blurb: "Park-day hero—huge bubbles, easy refill.",
+          reviews: [
+            R("Neighborhood kids all wanted a turn.", "Riley S.", 5),
+            R("Sticky hands but worth it.", "Jamie F.", 4),
+          ],
+        },
+      ],
+    },
+    {
+      id: "kd3",
+      name: "Storytime chapter book boxed set (age-rated)",
+      blurb:
+        "A series they can binge—pick the reading level that matches them.",
+      priceUSD: 42,
+      rating: 4.9,
+      forGender: null,
+      reviews: [
+        R("We read one chapter every night—hooks them fast.", "Emily R.", 5),
+        R("Nice paper; spines held up to rereads.", "Tyler W.", 5),
+      ],
+    },
+    {
+      id: "kd4",
+      name: "Board game night starter (family-friendly)",
+      blurb:
+        "Quick rules, laughs in 20 minutes—great for siblings or friends.",
+      priceUSD: 28,
+      rating: 4.8,
+      forGender: null,
+      reviews: [
+        R("Even grandparents joined in.", "Casey D.", 5),
+        R("Box is compact for travel.", "Alex M.", 4),
+      ],
+    },
+  ],
   general: [
     {
       id: "gen1",
@@ -1581,6 +1673,11 @@ const HOBBY_IMAGES = {
     "https://images.unsplash.com/photo-1614164185128-e4ec99c436d7?auto=format&fit=crop&w=1200&h=750&q=88",
     "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&h=750&q=88",
   ],
+  kids: [
+    "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=1200&h=750&q=88",
+    "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=1200&h=750&q=88",
+    "https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=1200&h=750&q=88",
+  ],
   general: [
     "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=1200&h=750&q=88",
     "https://images.unsplash.com/photo-1513885535751-8b9238ae3457?auto=format&fit=crop&w=1200&h=750&q=88",
@@ -1644,11 +1741,18 @@ export function inferHobbyIdsFromCustomLabels(labels) {
     ) {
       out.push("photo");
     }
+    if (
+      /\b(kids?|children|child|toddler|tween|playroom|kindergarten|playground|nursery)\b/.test(
+        low,
+      )
+    ) {
+      out.push("kids");
+    }
   }
   return [...new Set(out)];
 }
 
-const MAX_RESULTS = 10;
+const MAX_RESULTS = 18;
 
 /** Minimum price (USD) for non-luxury rows when "endless budget" is on — avoids $68 skillets. */
 const ENDLESS_MIN_PRICE_USD = 200;
@@ -1689,6 +1793,36 @@ export function rowIsDIY(g) {
   return false;
 }
 
+/** Experiences: tickets, classes, trips, vouchers — not only physical SKUs. */
+export function rowIsExperience(g) {
+  const chunks = [];
+  if (typeof g.name === "string") chunks.push(g.name);
+  if (typeof g.blurb === "string") chunks.push(g.blurb);
+  if (g.categoryTitle) chunks.push(g.categoryTitle);
+  if (g.variants?.length) {
+    for (const v of g.variants) {
+      if (v.name) chunks.push(v.name);
+      if (v.blurb) chunks.push(v.blurb);
+      if (v.tags?.length) chunks.push(v.tags.join(" "));
+    }
+  }
+  const blob = chunks.join(" ").toLowerCase();
+  if (
+    /\b(concert|tickets?|festival|vip\b|experience\b|excursion|getaway|retreat|spa day|massage\b|escape room|cooking class|wine tasting|workshop|lesson\b|membership|annual pass|day pass|hot air|skydiving|zipline|rafting|cruise\b|citypass|backstage|meet and greet|masterclass|guided tour|park pass|ski pass|theme park|track day|driving experience|observatory|planetarium)\b/.test(
+      blob,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(certificate|voucher|gift card)\b/.test(blob) &&
+    /\b(dining|spa|hotel|travel|resort|flight|airline)\b/.test(blob)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function rowMaxRating(g) {
   if (g.variants?.length) {
     return Math.max(...g.variants.map((v) => v.rating));
@@ -1715,6 +1849,7 @@ export function finalizeGiftRow(g, budgetUSD, sourceHobbyId, budgetUnlimited) {
  *   gender: 'male'|'female'|'nonbinary'|'other',
  *   budgetUSD: number,
  *   wantDIY?: boolean,
+ *   giftPreference?: 'diy' | 'experience' | 'premade',
  *   budgetUnlimited?: boolean
  * }} params
  */
@@ -1724,8 +1859,10 @@ export function getRecommendations({
   gender,
   budgetUSD,
   wantDIY = false,
+  giftPreference,
   budgetUnlimited = false,
 }) {
+  const pref = giftPreference ?? (wantDIY ? "diy" : "premade");
   const inferred = inferHobbyIdsFromCustomLabels(customLabels);
   const hobbyKeys = [...new Set([...selectedHobbyIds, ...inferred])];
 
@@ -1770,7 +1907,7 @@ export function getRecommendations({
     (g) => genderNeutral || g.forGender == null || g.forGender === gender,
   );
 
-  if (wantDIY) {
+  if (pref === "diy") {
     const diyFromSelected = eligible.filter((g) => rowIsDIY(g));
     if (diyFromSelected.length > 0) {
       eligible = diyFromSelected;
@@ -1794,6 +1931,9 @@ export function getRecommendations({
         eligible = [];
       }
     }
+  } else if (pref === "experience") {
+    const exp = eligible.filter((g) => rowIsExperience(g));
+    if (exp.length > 0) eligible = exp;
   }
 
   let finalized = eligible.map((g) =>

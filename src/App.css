@@ -1026,6 +1026,14 @@ h4 {
   max-width: 52ch;
 }
 
+.GiftCard__scoreCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.65rem;
+  min-width: 8.5rem;
+}
+
 .GiftCard__score {
   display: flex;
   flex-direction: column;
@@ -1213,6 +1221,526 @@ h4 {
   font-weight: 200;
 }
 
+/* --- Age slider (step 2) --- */
+.AgeSlider {
+  margin-bottom: 1.75rem;
+}
+
+.AgeSlider__readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.AgeSlider__label {
+  font-size: 1.45rem;
+  font-family: "DM Serif Display", Georgia, serif;
+  color: var(--accent);
+}
+
+.AgeSlider__years {
+  font-size: 0.95rem;
+  font-family: "Inter", sans-serif;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.AgeSlider__hint {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.AgeSlider__trackWrap {
+  --age-pct: 0%;
+  position: relative;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.AgeSlider__trackWrap::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(201, 162, 39, 0.55) 0%,
+    rgba(201, 162, 39, 0.35) var(--age-pct),
+    rgba(255, 255, 255, 0.06) var(--age-pct),
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  pointer-events: none;
+}
+
+.AgeSlider__range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 36px;
+  margin: 0;
+  background: transparent;
+  position: relative;
+  z-index: 1;
+  cursor: pointer;
+}
+
+.AgeSlider__range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 3px rgba(201, 162, 39, 0.35),
+    0 6px 20px rgba(201, 162, 39, 0.35);
+}
+
+.AgeSlider__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid rgba(12, 13, 18, 0.95);
+  cursor: grab;
+}
+
+.AgeSlider__ticks {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.AgeSlider__tick {
+  flex: 1 1 auto;
+  text-align: center;
+  min-width: 3.5rem;
+}
+
+.AgeSlider__ticks--numeric {
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Gift style (step 3) --- */
+.GiftPref__label {
+  margin-top: 1.75rem;
+}
+
+.GiftPref__intro {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.GiftPrefGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.GiftPrefCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+.GiftPrefCard:hover {
+  border-color: rgba(201, 162, 39, 0.35);
+}
+
+.GiftPrefCard--selected {
+  border-color: rgba(201, 162, 39, 0.55);
+  background: rgba(201, 162, 39, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.GiftPrefCard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.GiftPrefCard__emoji {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.GiftPrefCard__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.GiftPrefCard__sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* --- Budget number --- */
+.BudgetInputRow {
+  margin-bottom: 1.25rem;
+}
+
+.BudgetInputRow__input {
+  max-width: 12rem;
+  margin-top: 0.35rem;
+}
+
+/* --- Results toolbar & likes --- */
+.ResultsToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.LikedSection {
+  margin-bottom: 1.75rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  background: rgba(201, 162, 39, 0.06);
+}
+
+.LikedSection__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.LikedSection__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.LikedSection__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.LikedSection__name {
+  display: block;
+  font-weight: 500;
+  color: #e4e4e7;
+}
+
+.LikedSection__price {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.GiftCard__votes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.VoteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: #d4d4d8;
+  font-size: 0.82rem;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s;
+}
+
+.VoteBtn__icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.VoteBtn:hover {
+  border-color: rgba(201, 162, 39, 0.4);
+}
+
+.VoteBtn--like.VoteBtn--on {
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(34, 197, 94, 0.12);
+  color: #bbf7d0;
+}
+
+.VoteBtn--dislike:hover {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.VoteBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Pick-for-me modal (horizontal scroll strip) --- */
+.CaseModal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.25rem;
+  padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+}
+
+.CaseModal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .CaseModal__backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.72);
+  }
+}
+
+.CaseModal__panel {
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+  width: 100%;
+  padding: 1.35rem 1.25rem 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--stroke);
+  background: linear-gradient(
+    165deg,
+    rgba(22, 24, 32, 0.98),
+    rgba(12, 13, 18, 0.98)
+  );
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.CaseModal__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-family: "DM Serif Display", Georgia, serif;
+}
+
+.CaseModal__lede {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.CaseViewport {
+  position: relative;
+  min-height: 112px;
+  margin: 0 0 1.1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.35),
+    rgba(0, 0, 0, 0.55)
+  );
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.CaseViewport__inner {
+  position: relative;
+  height: 112px;
+  overflow: hidden;
+}
+
+.CaseViewport__inner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(12, 13, 18, 0.95) 0%,
+    rgba(12, 13, 18, 0) 14%,
+    rgba(12, 13, 18, 0) 86%,
+    rgba(12, 13, 18, 0.95) 100%
+  );
+}
+
+.CaseViewport__glow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.CaseViewport__glow--left {
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(201, 162, 39, 0.2),
+    transparent
+  );
+}
+
+.CaseViewport__glow--right {
+  right: 0;
+  background: linear-gradient(
+    270deg,
+    rgba(139, 92, 246, 0.2),
+    transparent
+  );
+}
+
+.CaseViewport__marker {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 5;
+  background: linear-gradient(
+    180deg,
+    rgba(201, 162, 39, 0.95),
+    rgba(139, 92, 246, 0.85)
+  );
+  box-shadow:
+    0 0 16px rgba(201, 162, 39, 0.45),
+    0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.CaseStrip {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  height: 100%;
+  align-items: stretch;
+  will-change: transform;
+}
+.CaseStrip--moving {
+  transition: transform 4.6s cubic-bezier(0.1, 0.85, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .CaseStrip--moving {
+    transition-duration: 0.01ms;
+  }
+}
+
+.CaseStrip__item {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.65rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(0, 0, 0, 0.15)
+  );
+}
+
+.CaseStrip__item:nth-child(odd) {
+  background: linear-gradient(
+    180deg,
+    rgba(139, 92, 246, 0.08),
+    rgba(0, 0, 0, 0.2)
+  );
+}
+
+.CaseStrip__name {
+  font-size: 0.8rem;
+  line-height: 1.3;
+  text-align: center;
+  color: #e4e4e7;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.CaseModal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.CaseModal__winner {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md);
+  background: rgba(201, 162, 39, 0.12);
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.CaseModal__winnerLabel {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
 @media (max-width: 720px) {
   .GiftCard {
     grid-template-columns: 1fr;
@@ -1229,6 +1757,15 @@ h4 {
 
   .GiftCard__head {
     padding-right: 0;
+  }
+
+  .GiftCard__scoreCol {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .GiftCard__votes {
+    justify-content: flex-start;
   }
 
   .GiftCard__score {

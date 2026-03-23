@@ -36,6 +36,36 @@ function formatMoney(amount, code) {
   }
 }
 
+/**
+ * Each fetch of recommendations can reuse the same underlying gift ids (e.g. Groq
+ * uses `gq-{slug}-{index}`). Prefix a per-load stamp so likes from an earlier batch
+ * do not mark a different product as liked when the list refreshes.
+ */
+function stampGiftIdsForResult(rec) {
+  if (!rec?.gifts?.length) return rec;
+  const stamp =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  return {
+    ...rec,
+    gifts: rec.gifts.map((g) => {
+      const oldId = g.id;
+      const newId = `rid-${stamp}::${oldId}`;
+      const variants = Array.isArray(g.variants)
+        ? g.variants.map((v) => ({
+            ...v,
+            id:
+              typeof v.id === "string" && v.id.startsWith(oldId)
+                ? newId + v.id.slice(oldId.length)
+                : v.id,
+          }))
+        : g.variants;
+      return { ...g, id: newId, variants };
+    }),
+  };
+}
+
 function Stars({ value, max = 5 }) {
   const full = Math.round(value);
   return (
@@ -58,8 +88,20 @@ const RECIPIENT_RELATIONS = [
   { id: "girlfriend", label: "Girlfriend", hint: "Partner", emoji: "💜" },
   { id: "mom", label: "Mom", hint: "Mother figure", emoji: "🌷" },
   { id: "dad", label: "Dad", hint: "Father figure", emoji: "🌿" },
-  { id: "friend", label: "Friend", hint: "Any gender", emoji: "🤝" },
+  { id: "kid", label: "Kid", hint: "Child or teen", emoji: "🧒" },
 ];
+
+/** Slider bounds for age in years (who you’re gifting). */
+function ageLimitsForRecipient(recipientId) {
+  if (!recipientId) return { min: 0, max: 100 };
+  if (recipientId === "mom" || recipientId === "dad")
+    return { min: 20, max: 100 };
+  if (recipientId === "boyfriend" || recipientId === "girlfriend") {
+    return { min: 15, max: 100 };
+  }
+  if (recipientId === "kid") return { min: 0, max: 17 };
+  return { min: 0, max: 100 };
+}
 
 const GENDER_OPTIONS = [
   { id: "male", label: "Male", hint: "He / him", emoji: "♂" },
@@ -67,27 +109,6 @@ const GENDER_OPTIONS = [
   { id: "nonbinary", label: "Nonbinary", hint: "They / them", emoji: "⚧" },
   { id: "other", label: "Other", hint: "Any / all", emoji: "♥" },
 ];
-
-const AGE_RANGES = [
-  { id: "0-12", label: "Child", hint: "12 & under" },
-  { id: "13-17", label: "Teen", hint: "13–17" },
-  { id: "18-25", label: "Young adult", hint: "18–25" },
-  { id: "26-40", label: "Adult", hint: "26–40" },
-  { id: "41-60", label: "Mature", hint: "41–60" },
-  { id: "60+", label: "Senior", hint: "60+" },
-];
-
-/** Age bands shown for “who” — parents aren’t children/teens; partners aren’t children. */
-function ageRangesForRecipient(recipientId) {
-  if (!recipientId) return AGE_RANGES;
-  if (recipientId === "mom" || recipientId === "dad") {
-    return AGE_RANGES.filter((a) => a.id !== "0-12" && a.id !== "13-17");
-  }
-  if (recipientId === "boyfriend" || recipientId === "girlfriend") {
-    return AGE_RANGES.filter((a) => a.id !== "0-12");
-  }
-  return AGE_RANGES;
-}
 
 /** @param {string | null} id */
 function recipientIdToGender(id) {
@@ -103,6 +124,7 @@ function recipientIdToGender(id) {
     case "nonbinary":
       return "nonbinary";
     case "friend":
+    case "kid":
       return "nonbinary";
     case "other":
       return "other";
@@ -124,6 +146,8 @@ function recipientRecapLabel(id) {
       return "your dad";
     case "friend":
       return "your friend";
+    case "kid":
+      return "your kid";
     case "male":
       return "a man";
     case "female":
@@ -213,12 +237,6 @@ const REFINE_PLACEHOLDER_BY_HOBBY = {
     "chef's knife 8 inch",
     "cast iron preseasoned",
   ],
-  travel: [
-    "carry-on size only",
-    "packing cubes set",
-    "TSA-friendly lock",
-    "RFID passport wallet",
-  ],
   design: [
     "A5 grid notebook",
     "minimal desk mat",
@@ -267,6 +285,12 @@ const REFINE_PLACEHOLDER_BY_HOBBY = {
     "gift receipt friendly",
     "eco packaging",
   ],
+  kids: [
+    "age range on the box",
+    "favorite character or theme",
+    "indoor vs outdoor play",
+    "no small parts / choking safe",
+  ],
 };
 
 /** First distinctive word from a product title to personalize refine hints. */
@@ -291,7 +315,9 @@ function refinePlaceholderForGift(gift, product) {
   const hid = gift._sourceHobbyId;
   const pool =
     REFINE_PLACEHOLDER_BY_HOBBY[hid] ?? REFINE_PLACEHOLDER_BY_HOBBY.general;
-  const seed = hashString(`${gift.id}|${product.name ?? ""}|${gift.categoryTitle ?? ""}`);
+  const seed = hashString(
+    `${gift.id}|${product.name ?? ""}|${gift.categoryTitle ?? ""}`,
+  );
   const line = pool[seed % pool.length];
 
   const word = firstSignificantProductWord(product.name ?? "");
@@ -313,6 +339,12 @@ function refinePlaceholderForGift(gift, product) {
 
   return `e.g. "${line}"`;
 }
+
+/** Horizontal picker strip — item width in px (must match CSS). */
+const CASE_ITEM_PX = 152;
+const CASE_CYCLES = 52;
+/** Slightly longer than CSS transition (4.6s) so `transitionend` can win. */
+const CASE_TRANSITION_FALLBACK_MS = 5600;
 
 function ProductImage({ searchQuery, fallbackSrc }) {
   const safeFallback = fallbackSrc || DEFAULT_GIFT_IMAGE_URL;
@@ -363,8 +395,23 @@ function ProductImage({ searchQuery, fallbackSrc }) {
 export default function App() {
   const [step, setStep] = useState("who");
   const [recipientId, setRecipientId] = useState(null);
-  const [recipientAgeRange, setRecipientAgeRange] = useState(null);
-  const [wantDIY, setWantDIY] = useState(false);
+  /** Age in years (constrained by relationship — see `ageLimits`). */
+  const [recipientAgeYears, setRecipientAgeYears] = useState(25);
+  /** @type {'diy' | 'experience' | 'premade' | null} */
+  const [giftPreference, setGiftPreference] = useState(null);
+  /** @type {{ key: string, gift: object }[]} */
+  const [likedEntries, setLikedEntries] = useState([]);
+  const [dislikedIds, setDislikedIds] = useState([]);
+  const [isReloading, setIsReloading] = useState(false);
+  const [caseOpen, setCaseOpen] = useState(false);
+  const [caseTranslateX, setCaseTranslateX] = useState(0);
+  const [caseTransitionOn, setCaseTransitionOn] = useState(false);
+  const [caseRunning, setCaseRunning] = useState(false);
+  /** @type {{ key: string, gift: object } | null} */
+  const [caseWinner, setCaseWinner] = useState(null);
+  const caseViewportRef = useRef(null);
+  const casePendingRef = useRef(null);
+  const caseFallbackTimerRef = useRef(null);
   const [selectedHobbyIds, setSelectedHobbyIds] = useState([]);
   const [customHobbies, setCustomHobbies] = useState([]);
   const [customInput, setCustomInput] = useState("");
@@ -395,9 +442,10 @@ export default function App() {
     [recipientId],
   );
 
-  const BUDGET_MIN_USD = 15;
   /** Slider cap in USD; use “endless budget” for spends above this. */
   const BUDGET_MAX_USD = 2500;
+  /** Minimum budget in display currency (slider + input floor). */
+  const budgetMinDisplay = 0;
 
   const budgetUsd = useMemo(() => {
     const rate = 1 / (usdToCurrency(1, currency) || 1);
@@ -411,10 +459,6 @@ export default function App() {
 
   const budgetInCurrency = budgetSlider;
 
-  const minDisplay = useMemo(
-    () => usdToCurrency(BUDGET_MIN_USD, currency),
-    [currency],
-  );
   const maxDisplay = useMemo(
     () => usdToCurrency(BUDGET_MAX_USD, currency),
     [currency],
@@ -422,10 +466,9 @@ export default function App() {
 
   const sliderPct = useMemo(() => {
     if (budgetUnlimited) return 100;
-    const span = maxDisplay - minDisplay;
-    if (span <= 0) return 0;
-    return ((budgetInCurrency - minDisplay) / span) * 100;
-  }, [budgetUnlimited, budgetInCurrency, minDisplay, maxDisplay]);
+    if (maxDisplay <= 0) return 0;
+    return (budgetInCurrency / maxDisplay) * 100;
+  }, [budgetUnlimited, budgetInCurrency, maxDisplay]);
 
   const hasPassions = selectedHobbyIds.length > 0 || customHobbies.length > 0;
 
@@ -434,10 +477,10 @@ export default function App() {
     setBudgetSlider((prev) => {
       let next = prev;
       if (next > maxDisplay) next = maxDisplay;
-      if (next < minDisplay) next = minDisplay;
+      if (next < budgetMinDisplay) next = budgetMinDisplay;
       return next;
     });
-  }, [budgetUnlimited, maxDisplay, minDisplay]);
+  }, [budgetUnlimited, maxDisplay]);
 
   useEffect(() => {
     return () => {
@@ -488,32 +531,35 @@ export default function App() {
 
   function pickRecipient(id) {
     setRecipientId(id);
-    setRecipientAgeRange(null);
+    const lim = ageLimitsForRecipient(id);
+    setRecipientAgeYears(Math.min(lim.max, Math.max(lim.min, 25)));
     setStep("age");
   }
 
-  const ageRangeChoices = useMemo(
-    () => ageRangesForRecipient(recipientId),
+  const ageLimits = useMemo(
+    () => ageLimitsForRecipient(recipientId),
     [recipientId],
   );
 
-  function goAge(ageId) {
-    setRecipientAgeRange(ageId);
+  useEffect(() => {
+    setRecipientAgeYears((a) =>
+      Math.min(ageLimits.max, Math.max(ageLimits.min, a)),
+    );
+  }, [ageLimits.min, ageLimits.max]);
+
+  const giftPref = giftPreference ?? "premade";
+
+  const ageSliderPct = useMemo(() => {
+    const span = ageLimits.max - ageLimits.min;
+    if (span <= 0) return 0;
+    return ((recipientAgeYears - ageLimits.min) / span) * 100;
+  }, [recipientAgeYears, ageLimits.min, ageLimits.max]);
+
+  function continueFromAge() {
     setStep("passion");
   }
 
-  async function goBudget() {
-    if (!hasPassions) return;
-    setVariantByGiftId({});
-    setRefineByGiftId({});
-    setGroqNoteByGiftId({});
-    setRefineErrorByGiftId({});
-    setWantThisErrorByGiftId({});
-    setStep("thinking");
-    setResult(null);
-
-    await new Promise((r) => setTimeout(r, 500));
-
+  async function fetchRecommendationsCore() {
     const hobbyTitles = selectedHobbyIds
       .map((id) => hobbies.find((h) => h.id === id)?.title)
       .filter(Boolean);
@@ -527,11 +573,12 @@ export default function App() {
           customLabels: customHobbies,
           gender,
           budgetUSD: budgetUsd,
-          wantDIY,
+          wantDIY: giftPref === "diy",
+          giftPreference: giftPref,
           budgetUnlimited,
           selectedHobbyIds,
           recipientId,
-          recipientAgeRange,
+          recipientAgeRange: String(recipientAgeYears),
         });
         if (ai?.gifts?.length) {
           rec = { gifts: ai.gifts, mode: "in", source: "groq" };
@@ -547,7 +594,8 @@ export default function App() {
         customLabels: customHobbies,
         gender,
         budgetUSD: budgetUsd,
-        wantDIY,
+        wantDIY: giftPref === "diy",
+        giftPreference: giftPref,
         budgetUnlimited,
       });
       rec = { ...catalogRec, source: "catalog" };
@@ -560,10 +608,11 @@ export default function App() {
             customLabels: customHobbies,
             gender,
             budgetUSD: budgetUnlimited ? null : budgetUsd,
-            wantDIY,
+            wantDIY: giftPref === "diy",
+            giftPreference: giftPref,
             budgetUnlimited,
             recipientId,
-            recipientAgeRange,
+            recipientAgeRange: String(recipientAgeYears),
           });
           if (ranked?.gifts?.length) {
             let ordered = ranked.gifts;
@@ -583,15 +632,139 @@ export default function App() {
       }
     }
 
-    setResult(rec);
+    return rec;
+  }
+
+  async function goBudget() {
+    if (!hasPassions || !giftPreference) return;
+    setVariantByGiftId({});
+    setRefineByGiftId({});
+    setGroqNoteByGiftId({});
+    setRefineErrorByGiftId({});
+    setWantThisErrorByGiftId({});
+    setDislikedIds([]);
+    setStep("thinking");
+    setResult(null);
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    const rec = await fetchRecommendationsCore();
+    setResult(stampGiftIdsForResult(rec));
     setStep("results");
+  }
+
+  async function reloadSuggestions() {
+    setIsReloading(true);
+    setVariantByGiftId({});
+    setRefineByGiftId({});
+    setGroqNoteByGiftId({});
+    setRefineErrorByGiftId({});
+    setWantThisErrorByGiftId({});
+    setDislikedIds([]);
+    try {
+      const rec = await fetchRecommendationsCore();
+      setResult(stampGiftIdsForResult(rec));
+    } finally {
+      setIsReloading(false);
+    }
+  }
+
+  function toggleLikeGift(gift) {
+    setLikedEntries((prev) => {
+      const i = prev.findIndex((e) => e.gift.id === gift.id);
+      if (i >= 0) return prev.filter((_, j) => j !== i);
+      const clone = JSON.parse(JSON.stringify(gift));
+      return [...prev, { key: `like-${gift.id}-${Date.now()}`, gift: clone }];
+    });
+  }
+
+  function removeLikedEntry(key) {
+    setLikedEntries((prev) => prev.filter((e) => e.key !== key));
+  }
+
+  function dislikeGift(giftId) {
+    setDislikedIds((prev) =>
+      prev.includes(giftId) ? prev : [...prev, giftId],
+    );
+  }
+
+  const caseStripItems = useMemo(() => {
+    if (likedEntries.length === 0) return [];
+    const out = [];
+    for (let c = 0; c < CASE_CYCLES; c++) {
+      for (let k = 0; k < likedEntries.length; k++) {
+        out.push(likedEntries[k]);
+      }
+    }
+    return out;
+  }, [likedEntries]);
+
+  function clearCaseFallbackTimer() {
+    if (caseFallbackTimerRef.current != null) {
+      clearTimeout(caseFallbackTimerRef.current);
+      caseFallbackTimerRef.current = null;
+    }
+  }
+
+  function finalizeCaseOpening() {
+    const pending = casePendingRef.current;
+    if (!pending) return;
+    clearCaseFallbackTimer();
+    casePendingRef.current = null;
+    setCaseWinner(pending);
+    setCaseRunning(false);
+  }
+
+  useEffect(() => () => clearCaseFallbackTimer(), []);
+
+  function startCaseOpening() {
+    if (likedEntries.length < 2) return;
+    const L = likedEntries.length;
+    const winIdx = Math.floor(Math.random() * L);
+    const picked = likedEntries[winIdx];
+    const stopSlot = Math.floor(CASE_CYCLES / 2) * L + winIdx;
+
+    clearCaseFallbackTimer();
+    casePendingRef.current = picked;
+    setCaseWinner(null);
+    setCaseRunning(true);
+    setCaseTransitionOn(false);
+    setCaseTranslateX(0);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const vw = caseViewportRef.current?.clientWidth ?? 360;
+        const finalX = vw / 2 - CASE_ITEM_PX / 2 - stopSlot * CASE_ITEM_PX;
+        setCaseTransitionOn(true);
+        setCaseTranslateX(finalX);
+        clearCaseFallbackTimer();
+        caseFallbackTimerRef.current = setTimeout(() => {
+          caseFallbackTimerRef.current = null;
+          finalizeCaseOpening();
+        }, CASE_TRANSITION_FALLBACK_MS);
+      });
+    });
+  }
+
+  function handleCaseTransitionEnd(e) {
+    if (e.propertyName !== "transform") return;
+    finalizeCaseOpening();
   }
 
   function restart() {
     setStep("who");
     setRecipientId(null);
-    setRecipientAgeRange(null);
-    setWantDIY(false);
+    setRecipientAgeYears(25);
+    setGiftPreference(null);
+    setLikedEntries([]);
+    setDislikedIds([]);
+    setCaseOpen(false);
+    clearCaseFallbackTimer();
+    casePendingRef.current = null;
+    setCaseTranslateX(0);
+    setCaseTransitionOn(false);
+    setCaseRunning(false);
+    setCaseWinner(null);
     setSelectedHobbyIds([]);
     setCustomHobbies([]);
     setCustomInput("");
@@ -852,24 +1025,50 @@ export default function App() {
               How old are they?
             </h2>
             <p className="Panel__lead">
-              Rough age helps GiftPicker match tone, hobbies, and price—pick the
-              closest band.
+              Set their age in years — Gifted uses it for tone and gift ideas.
+              {recipientId === "mom" || recipientId === "dad"
+                ? " Parents: ages 20–100."
+                : recipientId === "boyfriend" || recipientId === "girlfriend"
+                  ? " Partners: ages 15–100."
+                  : recipientId === "kid"
+                    ? " Kids: ages 0–17."
+                    : " Ages 0–100."}
             </p>
-            <div className="ChoiceRow ChoiceRow--age">
-              {ageRangeChoices.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  className="ChoiceCard"
-                  onClick={() => goAge(a.id)}
-                >
-                  <span className="ChoiceCard__emoji" aria-hidden>
-                    🎂
-                  </span>
-                  <span className="ChoiceCard__label">{a.label}</span>
-                  <span className="ChoiceCard__hint">{a.hint}</span>
-                </button>
-              ))}
+            <div className="AgeSlider">
+              <div
+                className="AgeSlider__readout"
+                aria-live="polite"
+                id="age-slider-readout"
+              >
+                <span className="AgeSlider__label">
+                  {recipientAgeYears}{" "}
+                  <span className="AgeSlider__years">years old</span>
+                </span>
+              </div>
+              <div
+                className="AgeSlider__trackWrap"
+                style={{ "--age-pct": `${ageSliderPct}%` }}
+              >
+                <input
+                  type="range"
+                  className="AgeSlider__range"
+                  min={ageLimits.min}
+                  max={ageLimits.max}
+                  step={1}
+                  value={recipientAgeYears}
+                  onChange={(e) => setRecipientAgeYears(Number(e.target.value))}
+                  aria-valuemin={ageLimits.min}
+                  aria-valuemax={ageLimits.max}
+                  aria-valuenow={recipientAgeYears}
+                  aria-valuetext={`${recipientAgeYears} years old`}
+                  aria-labelledby="age-title"
+                  aria-describedby="age-slider-readout"
+                />
+              </div>
+              <div className="AgeSlider__ticks AgeSlider__ticks--numeric">
+                <span>{ageLimits.min}</span>
+                <span>{ageLimits.max}</span>
+              </div>
             </div>
             <div className="Panel__actions">
               <button
@@ -878,6 +1077,13 @@ export default function App() {
                 onClick={() => setStep("who")}
               >
                 Back
+              </button>
+              <button
+                type="button"
+                className="Btn Btn--primary"
+                onClick={continueFromAge}
+              >
+                Continue
               </button>
             </div>
           </section>
@@ -890,8 +1096,8 @@ export default function App() {
               What makes them light up?
             </h2>
             <p className="Panel__lead">
-              Select several vibes, and add your own (for example <em>Cars</em>
-              )—we blend ideas across everything you pick.
+              Select several hobbies, or add your own — we blend ideas across
+              everything you pick.
             </p>
 
             {hasPassions && (
@@ -992,24 +1198,66 @@ export default function App() {
                 )}
             </div>
 
-            <div className="DIYToggle">
-              <label className="DIYToggle__label">
-                <input
-                  type="checkbox"
-                  className="DIYToggle__checkbox"
-                  checked={wantDIY}
-                  onChange={(e) => setWantDIY(e.target.checked)}
-                />
-                <span>I want to make it myself</span>
-              </label>
-              {wantDIY && (
-                <p className="DIYToggle__hint">
-                  We’ll prioritize things they create or personalize: origami
-                  sets, custom or build-your-own bouquets, handwritten or
-                  calligraphy love letters, paper crafts, keepsakes—sentimental
-                  handmade gifts, not just tool kits.
-                </p>
-              )}
+            <p className="FieldLabel GiftPref__label">Gift style</p>
+            <p className="GiftPref__intro">
+              Choose one — we’ll match ideas to how you want to give.
+            </p>
+            <div
+              className="GiftPrefGrid"
+              role="radiogroup"
+              aria-label="Gift style"
+            >
+              <button
+                type="button"
+                className={`GiftPrefCard${giftPreference === "diy" ? " GiftPrefCard--selected" : ""}`}
+                role="radio"
+                aria-checked={giftPreference === "diy"}
+                onClick={() => setGiftPreference("diy")}
+              >
+                <span className="GiftPrefCard__emoji" aria-hidden>
+                  ✂️
+                </span>
+                <span className="GiftPrefCard__title">
+                  I want to make it myself
+                </span>
+                <span className="GiftPrefCard__sub">
+                  Handmade, kits, and deeply personal touches
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`GiftPrefCard${giftPreference === "experience" ? " GiftPrefCard--selected" : ""}`}
+                role="radio"
+                aria-checked={giftPreference === "experience"}
+                onClick={() => setGiftPreference("experience")}
+              >
+                <span className="GiftPrefCard__emoji" aria-hidden>
+                  🎟️
+                </span>
+                <span className="GiftPrefCard__title">
+                  I want to give an experience
+                </span>
+                <span className="GiftPrefCard__sub">
+                  Tickets, classes, trips, spa days, memberships
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`GiftPrefCard${giftPreference === "premade" ? " GiftPrefCard--selected" : ""}`}
+                role="radio"
+                aria-checked={giftPreference === "premade"}
+                onClick={() => setGiftPreference("premade")}
+              >
+                <span className="GiftPrefCard__emoji" aria-hidden>
+                  🎁
+                </span>
+                <span className="GiftPrefCard__title">
+                  I want to buy something premade
+                </span>
+                <span className="GiftPrefCard__sub">
+                  Finished, ready-to-wrap products
+                </span>
+              </button>
             </div>
 
             <div className="Panel__actions">
@@ -1023,7 +1271,7 @@ export default function App() {
               <button
                 type="button"
                 className="Btn Btn--primary"
-                disabled={!hasPassions}
+                disabled={!hasPassions || !giftPreference}
                 onClick={() => setStep("budget")}
               >
                 Continue
@@ -1077,9 +1325,8 @@ export default function App() {
                     const nextPerUsd = usdToCurrency(1, next);
                     const usd = budgetSlider / prevPerUsd;
                     let nextVal = Math.round(usd * nextPerUsd);
-                    const lo = usdToCurrency(BUDGET_MIN_USD, next);
                     const hi = usdToCurrency(BUDGET_MAX_USD, next);
-                    nextVal = Math.min(hi, Math.max(lo, nextVal));
+                    nextVal = Math.min(hi, Math.max(0, nextVal));
                     setCurrency(next);
                     setBudgetSlider(nextVal);
                   }}
@@ -1123,43 +1370,57 @@ export default function App() {
                 <input
                   type="range"
                   className="Range"
-                  min={minDisplay}
+                  min={budgetMinDisplay}
                   max={maxDisplay}
-                  step={
-                    currency === "ILS"
-                      ? 20
-                      : maxDisplay - minDisplay > 5000
-                        ? 25
-                        : 10
-                  }
+                  step={currency === "ILS" ? 20 : maxDisplay > 5000 ? 25 : 10}
                   value={budgetInCurrency}
                   onChange={(e) => setBudgetSlider(Number(e.target.value))}
                   disabled={budgetUnlimited}
-                  aria-valuemin={minDisplay}
+                  aria-valuemin={budgetMinDisplay}
                   aria-valuemax={maxDisplay}
                   aria-valuenow={budgetInCurrency}
                 />
               </div>
               <div className="SliderBlock__ticks">
-                <span>{formatMoney(minDisplay, currency)}</span>
+                <span>{formatMoney(0, currency)}</span>
                 <span>{formatMoney(maxDisplay, currency)}</span>
               </div>
+            </div>
+
+            <div className="BudgetInputRow">
+              <label className="FieldLabel" htmlFor="budget-amount">
+                Exact amount (
+                {CURRENCIES.find((c) => c.code === currency)?.symbol ?? ""})
+              </label>
+              <input
+                id="budget-amount"
+                type="number"
+                inputMode="decimal"
+                className="Input BudgetInputRow__input"
+                min={0}
+                max={maxDisplay}
+                step={currency === "ILS" ? 20 : maxDisplay > 5000 ? 25 : 10}
+                disabled={budgetUnlimited}
+                value={budgetUnlimited ? "" : Math.round(budgetInCurrency)}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") return;
+                  const n = Number(raw);
+                  if (!Number.isFinite(n)) return;
+                  setBudgetSlider(
+                    Math.min(maxDisplay, Math.max(0, Math.round(n))),
+                  );
+                }}
+              />
             </div>
 
             {recapParts.length > 0 && recipientId && (
               <p className="Recap">
                 Gifting <strong>{recipientRecapLabel(recipientId)}</strong>
-                {recipientAgeRange && (
+                {recipientId && (
                   <>
                     {" "}
-                    (
-                    <strong>
-                      {
-                        AGE_RANGES.find((a) => a.id === recipientAgeRange)
-                          ?.label
-                      }
-                    </strong>
-                    )
+                    (<strong>{recipientAgeYears} years old</strong>)
                   </>
                 )}{" "}
                 into{" "}
@@ -1194,6 +1455,7 @@ export default function App() {
               <button
                 type="button"
                 className="Btn Btn--primary"
+                disabled={!giftPreference}
                 onClick={() => void goBudget()}
               >
                 Find gifts
@@ -1221,6 +1483,37 @@ export default function App() {
             <h2 id="results-title" className="Panel__title">
               Your shortlist
             </h2>
+            <div className="ResultsToolbar">
+              <button
+                type="button"
+                className="Btn Btn--secondary"
+                onClick={() => void reloadSuggestions()}
+                disabled={isReloading}
+              >
+                {isReloading ? "Loading…" : "More ideas"}
+              </button>
+              <button
+                type="button"
+                className="Btn Btn--ghost"
+                onClick={() => {
+                  clearCaseFallbackTimer();
+                  casePendingRef.current = null;
+                  setCaseWinner(null);
+                  setCaseTranslateX(0);
+                  setCaseTransitionOn(false);
+                  setCaseRunning(false);
+                  setCaseOpen(true);
+                }}
+                disabled={likedEntries.length < 2}
+                title={
+                  likedEntries.length < 2
+                    ? "Like at least two gifts to pick between them"
+                    : undefined
+                }
+              >
+                Pick for me
+              </button>
+            </div>
             {result.mode === "stretch" &&
               result.gifts.length > 0 &&
               !budgetUnlimited && (
@@ -1237,196 +1530,363 @@ export default function App() {
               </p>
             )}
 
-            <ul className="GiftList">
-              {result.gifts.map((gift, index) => {
-                const product = displayProduct(gift);
-                const priceLocal = usdToCurrency(product.priceUSD, currency);
-                const top = index === 0;
-                const fallbackImage = resolveGiftImage(
-                  { id: gift.id, image: product.image },
-                  gift._sourceHobbyId,
-                );
-                const imageSearchQuery =
-                  `${product.name} ${gift.categoryTitle || ""} ${gift._sourceHobbyId} gift`.trim();
-                const links = getRetailerLinks(product.name, countryCode);
-                const multi = gift.variants.length > 1;
-                const refining = refiningId === gift.id;
-                const refineLabel = "Refine";
-                return (
-                  <li
-                    key={gift.id}
-                    className={`GiftCard${top ? " GiftCard--top" : ""}${refining ? " GiftCard--refining" : ""}`}
-                  >
-                    <div className="GiftCard__media">
-                      {top && <div className="GiftCard__ribbon">Top pick</div>}
-                      <ProductImage
-                        searchQuery={imageSearchQuery}
-                        fallbackSrc={fallbackImage}
-                      />
-                    </div>
-                    <div className="GiftCard__body">
-                      {gift.categoryTitle && (
-                        <p className="GiftCard__category">
-                          {gift.categoryTitle}
-                        </p>
-                      )}
-                      <div className="GiftCard__head">
+            {likedEntries.length > 0 && (
+              <section
+                className="LikedSection"
+                aria-labelledby="liked-section-title"
+              >
+                <h3 id="liked-section-title" className="LikedSection__title">
+                  Saved likes
+                </h3>
+                <ul className="LikedSection__list">
+                  {likedEntries.map((entry) => {
+                    const lg = entry.gift;
+                    const lp = lg.selectedProduct;
+                    const lpLocal = usdToCurrency(lp.priceUSD, currency);
+                    return (
+                      <li key={entry.key} className="LikedSection__item">
                         <div>
-                          <h3 className="GiftCard__name">{product.name}</h3>
-                          <p className="GiftCard__blurb">{product.blurb}</p>
-                        </div>
-                        <div className="GiftCard__score">
-                          <span className="GiftCard__price">
-                            {formatMoney(priceLocal, currency)}
-                          </span>
-                          <span className="GiftCard__rating">
-                            {product.rating.toFixed(1)}{" "}
-                            <Stars value={product.rating} />
+                          <span className="LikedSection__name">{lp.name}</span>
+                          <span className="LikedSection__price">
+                            {formatMoney(lpLocal, currency)}
                           </span>
                         </div>
-                      </div>
-
-                      <div className="GiftCard__want">
                         <button
                           type="button"
-                          className="Btn Btn--want"
-                          onClick={() => void handleWantThis(gift)}
-                          disabled={openingGiftId === gift.id}
+                          className="Btn Btn--ghost Btn--small"
+                          onClick={() => removeLikedEntry(entry.key)}
                         >
-                          {openingGiftId === gift.id
-                            ? "Finding best store…"
-                            : "I want this"}
+                          Remove
                         </button>
-                        <p className="GiftCard__wantHint">
-                          {groqReady
-                            ? "Opens a shopping search picked for your region (smart routing when available)."
-                            : "Opens Google Shopping to compare prices across stores."}
-                        </p>
-                        {wantThisErrorByGiftId[gift.id] && (
-                          <p className="RefineBlock__error" role="status">
-                            {wantThisErrorByGiftId[gift.id]}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
+            {result.gifts.length > 0 &&
+              result.gifts.every((g) => dislikedIds.includes(g.id)) && (
+                <p className="Banner" role="status">
+                  Nothing left in this list—use <strong>More ideas</strong> for
+                  a fresh batch (your saved likes stay below).
+                </p>
+              )}
+
+            <ul className="GiftList">
+              {result.gifts
+                .filter((g) => !dislikedIds.includes(g.id))
+                .map((gift, index) => {
+                  const product = displayProduct(gift);
+                  const priceLocal = usdToCurrency(product.priceUSD, currency);
+                  const top = index === 0;
+                  const fallbackImage = resolveGiftImage(
+                    { id: gift.id, image: product.image },
+                    gift._sourceHobbyId,
+                  );
+                  const imageSearchQuery =
+                    `${product.name} ${gift.categoryTitle || ""} ${gift._sourceHobbyId} gift`.trim();
+                  const links = getRetailerLinks(product.name, countryCode);
+                  const multi = gift.variants.length > 1;
+                  const refining = refiningId === gift.id;
+                  const refineLabel = "Refine";
+                  const isLiked = likedEntries.some(
+                    (e) => e.gift.id === gift.id,
+                  );
+                  return (
+                    <li
+                      key={gift.id}
+                      className={`GiftCard${top ? " GiftCard--top" : ""}${refining ? " GiftCard--refining" : ""}`}
+                    >
+                      <div className="GiftCard__media">
+                        {top && (
+                          <div className="GiftCard__ribbon">Top pick</div>
+                        )}
+                        <ProductImage
+                          key={`${gift.id}-${product.id}`}
+                          searchQuery={imageSearchQuery}
+                          fallbackSrc={fallbackImage}
+                        />
+                      </div>
+                      <div className="GiftCard__body">
+                        {gift.categoryTitle && (
+                          <p className="GiftCard__category">
+                            {gift.categoryTitle}
                           </p>
                         )}
-                      </div>
+                        <div className="GiftCard__head">
+                          <div>
+                            <h3 className="GiftCard__name">{product.name}</h3>
+                            <p className="GiftCard__blurb">{product.blurb}</p>
+                          </div>
+                          <div className="GiftCard__scoreCol">
+                            <div className="GiftCard__votes">
+                              <button
+                                type="button"
+                                className={`VoteBtn VoteBtn--like${isLiked ? " VoteBtn--on" : ""}`}
+                                onClick={() => toggleLikeGift(gift)}
+                                aria-pressed={isLiked}
+                                aria-label={isLiked ? "Unlike" : "Like"}
+                              >
+                                <span className="VoteBtn__icon" aria-hidden>
+                                  👍
+                                </span>
+                                <span>{isLiked ? "Liked" : "Like"}</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="VoteBtn VoteBtn--dislike"
+                                onClick={() => dislikeGift(gift.id)}
+                                aria-label="Dislike — hide this idea"
+                              >
+                                <span className="VoteBtn__icon" aria-hidden>
+                                  👎
+                                </span>
+                                <span>Dislike</span>
+                              </button>
+                            </div>
+                            <div className="GiftCard__score">
+                              <span className="GiftCard__price">
+                                {formatMoney(priceLocal, currency)}
+                              </span>
+                              <span className="GiftCard__rating">
+                                {product.rating.toFixed(1)}{" "}
+                                <Stars value={product.rating} />
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
-                      <div className="GiftCard__controls">
-                        {multi && (
+                        <div className="GiftCard__want">
                           <button
                             type="button"
-                            className="Btn Btn--ghost Btn--small"
-                            onClick={() => handleAlternate(gift)}
-                            disabled={refining}
+                            className="Btn Btn--want"
+                            onClick={() => void handleWantThis(gift)}
+                            disabled={openingGiftId === gift.id}
                           >
-                            Show another option in this category
+                            {openingGiftId === gift.id
+                              ? "Finding best store…"
+                              : "I want this"}
                           </button>
-                        )}
-                        <div className="RefineBlock">
-                          <label
-                            className="FieldLabel"
-                            htmlFor={`refine-${gift.id}`}
-                          >
-                            Be more specific
-                          </label>
-                          <div className="RefineBlock__row">
-                            <input
-                              id={`refine-${gift.id}`}
-                              className="Input Input--compact"
-                              placeholder={refinePlaceholderForGift(gift, product)}
-                              value={refineByGiftId[gift.id] ?? ""}
-                              onChange={(e) =>
-                                setRefineByGiftId((prev) => ({
-                                  ...prev,
-                                  [gift.id]: e.target.value,
-                                }))
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  void handleRefine(gift);
-                                }
-                              }}
-                              disabled={refining}
-                            />
+                          <p className="GiftCard__wantHint">
+                            {groqReady
+                              ? "Opens a shopping search picked for your region (smart routing when available)."
+                              : "Opens Google Shopping to compare prices across stores."}
+                          </p>
+                          {wantThisErrorByGiftId[gift.id] && (
+                            <p className="RefineBlock__error" role="status">
+                              {wantThisErrorByGiftId[gift.id]}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="GiftCard__controls">
+                          {multi && (
                             <button
                               type="button"
-                              className="Btn Btn--secondary Btn--small"
-                              onClick={() => void handleRefine(gift)}
-                              disabled={
-                                refining || !refineByGiftId[gift.id]?.trim()
-                              }
+                              className="Btn Btn--ghost Btn--small"
+                              onClick={() => handleAlternate(gift)}
+                              disabled={refining}
                             >
-                              {refining ? "Thinking…" : refineLabel}
+                              Show another option in this category
                             </button>
-                          </div>
-                          <p className="RefineBlock__hint">
-                            {groqReady
-                              ? result.source === "groq"
-                                ? "Picks the variant on this card that best matches your note (or keyword matching if smart refine isn’t available)."
-                                : "Reads your note and chooses the best option from this card’s catalog list."
-                              : "On-device keyword matching picks a variant from this list."}
-                          </p>
-                          {groqNoteByGiftId[gift.id] && (
-                            <p className="RefineBlock__aiNote">
-                              <strong>Note:</strong> {groqNoteByGiftId[gift.id]}
-                            </p>
                           )}
-                          {refineErrorByGiftId[gift.id] && (
-                            <p className="RefineBlock__error" role="status">
-                              {refineErrorByGiftId[gift.id]}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="Retailers">
-                        <h4 className="Retailers__title">
-                          Shop this product (search)
-                        </h4>
-                        <div className="Retailers__grid">
-                          {links.map((link) => (
-                            <a
-                              key={link.id}
-                              className="RetailerLink"
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                          <div className="RefineBlock">
+                            <label
+                              className="FieldLabel"
+                              htmlFor={`refine-${gift.id}`}
                             >
-                              {link.label}
-                            </a>
-                          ))}
+                              Be more specific
+                            </label>
+                            <div className="RefineBlock__row">
+                              <input
+                                id={`refine-${gift.id}`}
+                                className="Input Input--compact"
+                                placeholder={refinePlaceholderForGift(
+                                  gift,
+                                  product,
+                                )}
+                                value={refineByGiftId[gift.id] ?? ""}
+                                onChange={(e) =>
+                                  setRefineByGiftId((prev) => ({
+                                    ...prev,
+                                    [gift.id]: e.target.value,
+                                  }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void handleRefine(gift);
+                                  }
+                                }}
+                                disabled={refining}
+                              />
+                              <button
+                                type="button"
+                                className="Btn Btn--secondary Btn--small"
+                                onClick={() => void handleRefine(gift)}
+                                disabled={
+                                  refining || !refineByGiftId[gift.id]?.trim()
+                                }
+                              >
+                                {refining ? "Thinking…" : refineLabel}
+                              </button>
+                            </div>
+                            <p className="RefineBlock__hint">
+                              {groqReady
+                                ? result.source === "groq"
+                                  ? "Picks the variant on this card that best matches your note (or keyword matching if smart refine isn’t available)."
+                                  : "Reads your note and chooses the best option from this card’s catalog list."
+                                : "On-device keyword matching picks a variant from this list."}
+                            </p>
+                            {groqNoteByGiftId[gift.id] && (
+                              <p className="RefineBlock__aiNote">
+                                <strong>Note:</strong>{" "}
+                                {groqNoteByGiftId[gift.id]}
+                              </p>
+                            )}
+                            {refineErrorByGiftId[gift.id] && (
+                              <p className="RefineBlock__error" role="status">
+                                {refineErrorByGiftId[gift.id]}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="Retailers">
+                          <h4 className="Retailers__title">
+                            Shop this product (search)
+                          </h4>
+                          <div className="Retailers__grid">
+                            {links.map((link) => (
+                              <a
+                                key={link.id}
+                                className="RetailerLink"
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {link.label}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="Reviews">
+                          <h4 className="Reviews__title">
+                            {gift._aiGenerated
+                              ? "Buyer-style reviews"
+                              : "What buyers often say"}
+                          </h4>
+                          <p className="Reviews__disclaimer">
+                            {gift._aiGenerated
+                              ? "Sample reviews typical of marketplace listings—always open the seller’s page to read verified feedback before you buy."
+                              : "Representative comments for this product type—each store shows real, verified reviews on the listing."}
+                          </p>
+                          <ul className="Reviews__list">
+                            {product.reviews.map((rev, i) => (
+                              <li key={i} className="Review">
+                                <div className="Review__meta">
+                                  <Stars value={rev.stars} />
+                                  <span className="Review__author">
+                                    {rev.author}
+                                  </span>
+                                </div>
+                                <p className="Review__text">{rev.text}</p>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
+                    </li>
+                  );
+                })}
+            </ul>
 
-                      <div className="Reviews">
-                        <h4 className="Reviews__title">
-                          {gift._aiGenerated
-                            ? "Buyer-style reviews"
-                            : "What buyers often say"}
-                        </h4>
-                        <p className="Reviews__disclaimer">
-                          {gift._aiGenerated
-                            ? "Sample reviews typical of marketplace listings—always open the seller’s page to read verified feedback before you buy."
-                            : "Representative comments for this product type—each store shows real, verified reviews on the listing."}
-                        </p>
-                        <ul className="Reviews__list">
-                          {product.reviews.map((rev, i) => (
-                            <li key={i} className="Review">
-                              <div className="Review__meta">
-                                <Stars value={rev.stars} />
-                                <span className="Review__author">
-                                  {rev.author}
-                                </span>
-                              </div>
-                              <p className="Review__text">{rev.text}</p>
-                            </li>
-                          ))}
-                        </ul>
+            {caseOpen && (
+              <div
+                className="CaseModal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="pick-for-me-modal-title"
+              >
+                <button
+                  type="button"
+                  className="CaseModal__backdrop"
+                  aria-label="Close"
+                  onClick={() => !caseRunning && setCaseOpen(false)}
+                />
+                <div className="CaseModal__panel">
+                  <h3 id="pick-for-me-modal-title" className="CaseModal__title">
+                    Picking an option for you
+                  </h3>
+                  <p className="CaseModal__lede">
+                    Your liked ideas scroll past the marker, then we land on one
+                    gift to suggest.
+                  </p>
+                  <div className="CaseViewport" ref={caseViewportRef}>
+                    <div
+                      className="CaseViewport__glow CaseViewport__glow--left"
+                      aria-hidden
+                    />
+                    <div
+                      className="CaseViewport__glow CaseViewport__glow--right"
+                      aria-hidden
+                    />
+                    <div className="CaseViewport__inner">
+                      <div
+                        className={`CaseStrip${caseTransitionOn ? " CaseStrip--moving" : ""}`}
+                        style={{
+                          transform: `translate3d(${caseTranslateX}px,0,0)`,
+                        }}
+                        onTransitionEnd={handleCaseTransitionEnd}
+                      >
+                        {caseStripItems.map((entry, i) => (
+                          <div
+                            key={`${entry.key}-${i}`}
+                            className="CaseStrip__item"
+                            style={{
+                              width: CASE_ITEM_PX,
+                              minWidth: CASE_ITEM_PX,
+                            }}
+                          >
+                            <span className="CaseStrip__name">
+                              {displayProduct(entry.gift).name}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
+                    <div className="CaseViewport__marker" aria-hidden />
+                  </div>
+                  <div className="CaseModal__actions">
+                    <button
+                      type="button"
+                      className="Btn Btn--primary"
+                      onClick={startCaseOpening}
+                      disabled={caseRunning || likedEntries.length < 2}
+                    >
+                      {caseRunning ? "Choosing…" : "Choose for me"}
+                    </button>
+                    {caseWinner && (
+                      <p className="CaseModal__winner" role="status">
+                        <span className="CaseModal__winnerLabel">
+                          You should gift:
+                        </span>
+                        <strong>{displayProduct(caseWinner.gift).name}</strong>
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      className="Btn Btn--ghost"
+                      onClick={() => !caseRunning && setCaseOpen(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="Panel__actions Panel__actions--solo">
               <button

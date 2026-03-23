@@ -8,7 +8,7 @@ import {
   isGroqConfigured,
 } from "./groqClient.js";
 
-const MAX_AI_GIFTS = 10;
+const MAX_AI_GIFTS = 18;
 
 function hashString(s) {
   let h = 0;
@@ -106,7 +106,14 @@ function formatRecipientMeta(recipientId, recipientAgeRange) {
   if (!rel && !age) return "";
   const bits = [];
   if (rel) bits.push(`Who: ${rel}`);
-  if (age) bits.push(`Age band: ${age}`);
+  if (age) {
+    const n = Number(age);
+    bits.push(
+      Number.isFinite(n) && String(n) === age.trim()
+        ? `Age: ${n} years`
+        : `Age: ${age}`,
+    );
+  }
   return `- ${bits.join(" | ")}\n`;
 }
 
@@ -119,6 +126,7 @@ function formatRecipientMeta(recipientId, recipientAgeRange) {
  *   gender: string,
  *   budgetUSD: number | null,
  *   wantDIY?: boolean,
+ *   giftPreference?: 'diy' | 'experience' | 'premade',
  *   budgetUnlimited?: boolean,
  *   recipientId?: string | null,
  *   recipientAgeRange?: string | null,
@@ -131,6 +139,7 @@ export async function rankGiftsWithGroq({
   gender,
   budgetUSD,
   wantDIY = false,
+  giftPreference = null,
   budgetUnlimited = false,
   recipientId = null,
   recipientAgeRange = null,
@@ -174,6 +183,21 @@ export async function rankGiftsWithGroq({
     ? `- Budget: **UNLIMITED / endless**. Prioritize the most impressive, premium, and memorable gifts in the list. Favor higher-priced options when they clearly deliver more joy, status, or longevity (watches, fine jewelry, designer goods, flagship cameras, pro PC parts, car experiences, etc.). Luxury-oriented rows are expected.\n`
     : `- Budget (USD, soft cap): ${Number(budgetUSD ?? 0).toFixed(2)}\n`;
 
+  const pref =
+    giftPreference === "diy" ||
+    giftPreference === "experience" ||
+    giftPreference === "premade"
+      ? giftPreference
+      : wantDIY
+        ? "diy"
+        : "premade";
+  const prefLine =
+    pref === "diy"
+      ? "- Gift preference: **Handmade & personal** — origami, custom bouquets, love letters / calligraphy, paper crafts, sentimental DIY—not only electronics or tool kits.\n"
+      : pref === "experience"
+        ? "- Gift preference: **Experiences & memories** — tickets, classes, spa, trips, workshops, vouchers, memberships—prioritize things they *do*, not only objects.\n"
+        : "- Gift preference: **Ready-made products** — finished, shoppable items they unwrap.\n";
+
   const recipientMeta = formatRecipientMeta(recipientId, recipientAgeRange);
 
   const prompt = `You are an expert gift advisor.
@@ -181,7 +205,7 @@ export async function rankGiftsWithGroq({
 User context:
 - Gifts for: ${genderLabel}
 ${recipientMeta}- Interests (hobbies): ${JSON.stringify([...hobbyTitles, ...customLabels])}
-${budgetLine}${wantDIY ? "- Gift preference: **Handmade & personal** — origami, custom bouquets, love letters / calligraphy, paper crafts, sentimental DIY—not only electronics or tool kits.\n" : ""}
+${budgetLine}${prefLine}
 Reorder the gift options from MOST exciting and memorable to still-good, best overall fit for this person.
 
 Guidance:
@@ -222,7 +246,7 @@ ${JSON.stringify(options, null, 2)}`;
 
 /**
  * Invent fresh gift ideas via Groq (not limited to the static catalog).
- * When wantDIY is true, the prompt requires mostly hands-on / kit / materials ideas.
+ * giftPreference: diy | experience | premade shapes the catalog-style ideas.
  */
 export async function generateGiftIdeasWithGroq({
   hobbyTitles,
@@ -230,6 +254,7 @@ export async function generateGiftIdeasWithGroq({
   gender,
   budgetUSD,
   wantDIY = false,
+  giftPreference = null,
   budgetUnlimited = false,
   selectedHobbyIds = [],
   recipientId = null,
@@ -252,16 +277,34 @@ export async function generateGiftIdeasWithGroq({
     ? `Budget: UNLIMITED — include impressive premium ideas when they fit (flagship GPUs, prebuilt workstations, pro tools, luxury experiences). Use realistic US retail ballparks in priceUSD.`
     : `Soft budget ~$${Number(budgetUSD).toFixed(0)} USD — most variants should fall near or under this; one slightly higher tier is OK if the blurb explains it.`;
 
-  const diySection = wantDIY
-    ? `
-CRITICAL — "I want to make it myself" IS CHECKED (handmade, romantic, creative — NOT mainly PC/electronics toolkits):
-- The user wants **gifts they (or the couple) create or deeply personalize**: origami paper and books, custom or build-your-own flower bouquets / dried-flower kits, handwritten or calligraphy love letters (nice paper, wax seals, fountain pens), scrapbooks, memory boxes, paper stars/lanterns, candle-making or soap-making for beginners, beginner watercolor or sketch sets for a personal card, couples’ workshop vouchers to make something together, etc.
-- Include **sentimental, tactile, paper/floral/letter** angles. Electronics soldering / PC building should be **at most 1–2 ideas** if hobbies demand it—not the default.
-- At least 8 of 10 rows must be clearly in this handmade/personal-DIY spirit. Set "diy": true on those rows; at most 2 rows "diy": false if needed.
+  const pref =
+    giftPreference === "diy" ||
+    giftPreference === "experience" ||
+    giftPreference === "premade"
+      ? giftPreference
+      : wantDIY
+        ? "diy"
+        : "premade";
+
+  const preferenceSection =
+    pref === "diy"
+      ? `
+CRITICAL — **Handmade & personal** (NOT mainly PC/electronics toolkits):
+- The user wants **gifts they create or deeply personalize**: origami, custom bouquets, love letters / calligraphy, scrapbooks, memory boxes, candle-making, soap-making for beginners, watercolor for cards, couples’ workshops to make something together, etc.
+- Include **sentimental, tactile, paper/floral/letter** angles. Electronics soldering / PC building **at most 1–2 ideas** if hobbies demand it.
+- At least 14 of 18 rows must be clearly handmade/personal-DIY. Set "diy": true on those rows.
 `
-    : `
-- Mix creative finished gifts with optional handmade or kit ideas where relevant.
-- Set "diy": true when the idea is something they make or personalize; false for ready-made only.
+      : pref === "experience"
+        ? `
+CRITICAL — **Experiences & memories** (things they *do*):
+- Prioritize **tickets, classes, spa days, trips, tours, workshops, memberships, hot-air balloons, driving experiences, concert VIP, cooking schools, wine tastings, escape rooms, national-park passes**, and **gift cards toward travel/dining/spa** when they fit the hobbies.
+- Physical objects should be secondary; when included, tie them to an experience (e.g. nice luggage for a trip you describe as part of the blurb).
+- Set "diy": false on most rows unless the experience is explicitly a make-it-together workshop.
+`
+        : `
+CRITICAL — **Ready-made products** they unwrap:
+- Prioritize **finished, shippable gifts**: gear, accessories, decor, consumables, boxed sets—not open-ended “plan a trip” unless paired with a concrete voucher or pass product.
+- Set "diy": false unless the product is explicitly a commercial kit they assemble at home.
 `;
 
   const recipientMeta = formatRecipientMeta(recipientId, recipientAgeRange);
@@ -273,10 +316,10 @@ ${recipientMeta}Interests: ${JSON.stringify([...hobbyTitles, ...customLabels])}
 Primary hobby bucket (for theming): ${hobbyKey}
 
 ${budgetInstruction}
-${diySection}
+${preferenceSection}
 
 Rules:
-- Return exactly 10 objects in "gifts" (fewer only if impossible—prefer 10).
+- Return exactly 18 objects in "gifts" (fewer only if impossible—prefer 18).
 - Each gift: "stableId" (short slug), "category" (section title), "diy" (boolean), "variants" array with 1–3 items (different price tiers or configurations)—use 2–3 when possible.
 - Each variant: "name", "blurb" (one sentence), "priceUSD" (number), "tags" (2–6 strings).
 - Ideas must feel unique and well-matched—avoid repeating the same product type across rows.
