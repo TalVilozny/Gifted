@@ -1344,9 +1344,45 @@ h4 {
 .AgeSlider__readout {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 0.5rem 1rem;
   margin-bottom: 1rem;
+}
+
+.AgeSlider__nudge {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  font-family: "Inter", system-ui, sans-serif;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    opacity 0.2s;
+}
+
+.AgeSlider__nudge:hover:not(:disabled) {
+  border-color: rgba(201, 162, 39, 0.45);
+  background: rgba(201, 162, 39, 0.1);
+}
+
+.AgeSlider__nudge:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.AgeSlider__nudge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .AgeSlider__label {

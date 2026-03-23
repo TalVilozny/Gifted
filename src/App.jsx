@@ -416,6 +416,22 @@ function getPageFromLocation() {
   return p === PRIVACY_PATH ? "privacy" : "app";
 }
 
+function isSubscriptionLikeGift(gift, product) {
+  const chunks = [
+    product?.name,
+    product?.blurb,
+    gift?.categoryTitle,
+    ...(Array.isArray(product?.tags) ? product.tags : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return /\b(subscription|subscribed|membership|monthly|annual|plan|pass|credits?|gift card|voucher|box)\b/.test(
+    chunks,
+  );
+}
+
 function ProductImage({ searchQuery, fallbackSrc }) {
   const safeFallback = fallbackSrc || DEFAULT_GIFT_IMAGE_URL;
   const fallbackRef = useRef(safeFallback);
@@ -606,6 +622,11 @@ export default function App() {
     syncPageFromLocation();
     return () => window.removeEventListener("popstate", syncPageFromLocation);
   }, []);
+
+  useEffect(() => {
+    // Keep each step/page transition starting at the top.
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step, pageMode]);
 
   function cancelBudgetRangeAnimation() {
     if (budgetAnimateRafRef.current != null) {
@@ -1074,6 +1095,10 @@ export default function App() {
 
   async function handleWantThis(gift) {
     const product = displayProduct(gift);
+    const isSubscription = isSubscriptionLikeGift(gift, product);
+    const subscriptionSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(
+      `${product.name} subscription`,
+    )}`;
     const links = getRetailerLinks(product.name, countryCode);
     const countryLabel =
       SHOP_COUNTRIES.find((c) => c.code === countryCode)?.label ?? "";
@@ -1087,9 +1112,9 @@ export default function App() {
     });
 
     setOpeningGiftId(gift.id);
-    let url = fallbackUrl;
+    let url = isSubscription ? subscriptionSearchUrl : fallbackUrl;
     try {
-      if (groqReady) {
+      if (!isSubscription && groqReady) {
         try {
           const pick = await pickBestRetailerWithGroq({
             productName: product.name,
@@ -1457,10 +1482,36 @@ export default function App() {
                     aria-live="polite"
                     id="age-slider-readout"
                   >
+                    <button
+                      type="button"
+                      className="AgeSlider__nudge"
+                      onClick={() =>
+                        setRecipientAgeYears((a) =>
+                          Math.max(ageLimits.min, a - 1),
+                        )
+                      }
+                      disabled={recipientAgeYears <= ageLimits.min}
+                      aria-label="Decrease age by 1"
+                    >
+                      ‹
+                    </button>
                     <span className="AgeSlider__label">
                       {recipientAgeYears}{" "}
                       <span className="AgeSlider__years">years old</span>
                     </span>
+                    <button
+                      type="button"
+                      className="AgeSlider__nudge"
+                      onClick={() =>
+                        setRecipientAgeYears((a) =>
+                          Math.min(ageLimits.max, a + 1),
+                        )
+                      }
+                      disabled={recipientAgeYears >= ageLimits.max}
+                      aria-label="Increase age by 1"
+                    >
+                      ›
+                    </button>
                   </div>
                   <div
                     className="AgeSlider__trackWrap"
