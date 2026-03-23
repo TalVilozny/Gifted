@@ -86,8 +86,8 @@ function toggleInList(list, id) {
 const RECIPIENT_RELATIONS = [
   { id: "boyfriend", label: "Boyfriend", hint: "Partner", emoji: "💙" },
   { id: "girlfriend", label: "Girlfriend", hint: "Partner", emoji: "💜" },
-  { id: "mom", label: "Mom", hint: "Mother figure", emoji: "🌷" },
-  { id: "dad", label: "Dad", hint: "Father figure", emoji: "🌿" },
+  { id: "mom", label: "Mom", hint: "Parent", emoji: "🌷" },
+  { id: "dad", label: "Dad", hint: "Parent", emoji: "🌿" },
   { id: "kid", label: "Kid", hint: "Child or teen", emoji: "🧒" },
 ];
 
@@ -906,7 +906,9 @@ export default function App() {
     const rec = await fetchRecommendationsCore();
     setResult(stampGiftIdsForResult(rec));
     if (giftPref === "diy") {
-      setDiyTutorialIds((prev) => pickRandomTutorialIds(DIY_TUTORIALS, 3, prev));
+      setDiyTutorialIds((prev) =>
+        pickRandomTutorialIds(DIY_TUTORIALS, 3, prev),
+      );
     }
     setStep("results");
   }
@@ -1103,9 +1105,7 @@ export default function App() {
     const fromCustom = inferHobbyIdsFromCustomLabels(customHobbies);
     const ids = [...selectedHobbyIds, ...fromCustom];
     const unique = [...new Set(ids)];
-    return unique
-      .map((id) => hobbies.find((h) => h.id === id))
-      .filter(Boolean);
+    return unique.map((id) => hobbies.find((h) => h.id === id)).filter(Boolean);
   }, [selectedHobbyIds, customHobbies]);
 
   const visibleShortlistGifts = useMemo(() => {
@@ -1114,7 +1114,8 @@ export default function App() {
       .filter((g) => !dislikedIds.includes(g.id))
       .filter(
         (g) =>
-          activeHobbyFilterId == null || g._sourceHobbyId === activeHobbyFilterId,
+          activeHobbyFilterId == null ||
+          g._sourceHobbyId === activeHobbyFilterId,
       );
   }, [result, dislikedIds, activeHobbyFilterId]);
 
@@ -1359,8 +1360,8 @@ export default function App() {
                   Picking a gift for a person or a group
                 </h2>
                 <p className="Panel__lead">
-                  Choose whether you&rsquo;re gifting one person or a group. Then
-                  we&rsquo;ll ask for age so recommendations fit.
+                  Choose whether you&rsquo;re gifting one person or a group.
+                  Then we&rsquo;ll ask for age so recommendations fit.
                 </p>
                 {audienceMode == null && (
                   <div className="ChoiceRow ChoiceRow--relations">
@@ -1485,7 +1486,9 @@ export default function App() {
                           ♂️
                         </span>
                         <span className="ChoiceCard__label">All male</span>
-                        <span className="ChoiceCard__hint">Same-gender group</span>
+                        <span className="ChoiceCard__hint">
+                          Same-gender group
+                        </span>
                       </button>
                       <button
                         type="button"
@@ -1497,7 +1500,9 @@ export default function App() {
                           ♀️
                         </span>
                         <span className="ChoiceCard__label">All female</span>
-                        <span className="ChoiceCard__hint">Same-gender group</span>
+                        <span className="ChoiceCard__hint">
+                          Same-gender group
+                        </span>
                       </button>
                       <button
                         type="button"
@@ -1544,7 +1549,9 @@ export default function App() {
                         Selected:{" "}
                         <strong>
                           {groupKindId
-                            ? GROUP_KIND_OPTIONS.find((x) => x.id === groupKindId)?.label
+                            ? GROUP_KIND_OPTIONS.find(
+                                (x) => x.id === groupKindId,
+                              )?.label
                             : "Choose group"}
                         </strong>{" "}
                         ·{" "}
@@ -2194,13 +2201,19 @@ export default function App() {
                   </button>
                 </div>
                 {showDiyTutorials && (
-                  <section className="DiyTutorials" aria-labelledby="diy-tutorials-title">
-                    <h3 id="diy-tutorials-title" className="DiyTutorials__title">
+                  <section
+                    className="DiyTutorials"
+                    aria-labelledby="diy-tutorials-title"
+                  >
+                    <h3
+                      id="diy-tutorials-title"
+                      className="DiyTutorials__title"
+                    >
                       DIY ideas you can make without buying a kit
                     </h3>
                     <p className="DiyTutorials__lead">
-                      Since you picked “I want to make it myself” with a lower budget,
-                      here are tutorials for handmade gifts.
+                      Since you picked “I want to make it myself” with a lower
+                      budget, here are tutorials for handmade gifts.
                     </p>
                     <ul className="DiyTutorials__list">
                       {visibleDiyTutorials.map((item) => (
@@ -2301,256 +2314,252 @@ export default function App() {
 
                 <ul className="GiftList">
                   {visibleShortlistGifts.map((gift, index) => {
-                      const product = displayProduct(gift);
-                      const giftTotalUsd = isGroupRecipient
-                        ? product.priceUSD * safeGroupSize
-                        : product.priceUSD;
-                      const priceLocal = usdToCurrency(giftTotalUsd, currency);
-                      const eachLocal = usdToCurrency(product.priceUSD, currency);
-                      const top = index === 0;
-                      // When Pexels isn't configured, avoid the catalog's illustrative images
-                      // (they can be mismatched). When it is configured, Pexels will replace
-                      // the fallback quickly anyway.
-                      const fallbackImage = pexelsReady
-                        ? resolveGiftImage(
-                            { id: gift.id, image: product.image },
-                            gift._sourceHobbyId,
-                          )
-                        : resolveGiftImage({ id: gift.id }, gift._sourceHobbyId);
+                    const product = displayProduct(gift);
+                    const giftTotalUsd = isGroupRecipient
+                      ? product.priceUSD * safeGroupSize
+                      : product.priceUSD;
+                    const priceLocal = usdToCurrency(giftTotalUsd, currency);
+                    const eachLocal = usdToCurrency(product.priceUSD, currency);
+                    const top = index === 0;
+                    // When Pexels isn't configured, avoid the catalog's illustrative images
+                    // (they can be mismatched). When it is configured, Pexels will replace
+                    // the fallback quickly anyway.
+                    const fallbackImage = pexelsReady
+                      ? resolveGiftImage(
+                          { id: gift.id, image: product.image },
+                          gift._sourceHobbyId,
+                        )
+                      : resolveGiftImage({ id: gift.id }, gift._sourceHobbyId);
 
-                      // Prefer vendor/catalog image when available; only use stock photo
-                      // lookup for items that don't provide a concrete image.
-                      const hasProductImage = Boolean(product.image);
-                      const imageSearchQuery = buildImageSearchQuery(product, gift);
-                      const links = getRetailerLinks(product.name, countryCode);
-                      const multi = gift.variants.length > 1;
-                      const refining = refiningId === gift.id;
-                      const refineLabel = "Refine";
-                      const isLiked = likedEntries.some(
-                        (e) => e.gift.id === gift.id,
-                      );
-                      return (
-                        <li
-                          key={gift.id}
-                          className={`GiftCard${top ? " GiftCard--top" : ""}${refining ? " GiftCard--refining" : ""}`}
-                        >
-                          <div className="GiftCard__media">
-                            {top && (
-                              <div className="GiftCard__ribbon">Top pick</div>
-                            )}
-                            <ProductImage
-                              key={`${gift.id}-${product.id}`}
-                              searchQuery={imageSearchQuery}
-                              fallbackSrc={fallbackImage}
-                              usePexels={pexelsReady && !hasProductImage}
-                            />
-                          </div>
-                          <div className="GiftCard__body">
-                            {gift.categoryTitle && (
-                              <p className="GiftCard__category">
-                                {gift.categoryTitle}
-                              </p>
-                            )}
-                            <div className="GiftCard__head">
-                              <div>
-                                <h3 className="GiftCard__name">
-                                  {product.name}
-                                </h3>
-                                <p className="GiftCard__blurb">
-                                  {product.blurb}
-                                </p>
-                              </div>
-                              <div className="GiftCard__scoreCol">
-                                <div className="GiftCard__votes">
-                                  <button
-                                    type="button"
-                                    className={`VoteBtn VoteBtn--like${isLiked ? " VoteBtn--on" : ""}`}
-                                    onClick={() => toggleLikeGift(gift)}
-                                    aria-pressed={isLiked}
-                                    aria-label={isLiked ? "Unlike" : "Like"}
-                                  >
-                                    <span className="VoteBtn__icon" aria-hidden>
-                                      👍
-                                    </span>
-                                    <span>{isLiked ? "Liked" : "Like"}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="VoteBtn VoteBtn--dislike"
-                                    onClick={() => dislikeGift(gift.id)}
-                                    aria-label="Dislike — hide this idea"
-                                  >
-                                    <span className="VoteBtn__icon" aria-hidden>
-                                      👎
-                                    </span>
-                                    <span>Dislike</span>
-                                  </button>
-                                </div>
-                                <div className="GiftCard__score">
-                                  <span className="GiftCard__price">
-                                    {formatMoney(priceLocal, currency)}
-                                  </span>
-                              {isGroupRecipient && (
-                                <span className="GiftCard__priceMeta">
-                                  total for {safeGroupSize} people ({formatMoney(eachLocal, currency)} each)
-                                </span>
-                              )}
-                                  <span className="GiftCard__rating">
-                                    {product.rating.toFixed(1)}{" "}
-                                    <Stars value={product.rating} />
-                                  </span>
-                                </div>
-                              </div>
+                    // Prefer vendor/catalog image when available; only use stock photo
+                    // lookup for items that don't provide a concrete image.
+                    const hasProductImage = Boolean(product.image);
+                    const imageSearchQuery = buildImageSearchQuery(
+                      product,
+                      gift,
+                    );
+                    const links = getRetailerLinks(product.name, countryCode);
+                    const multi = gift.variants.length > 1;
+                    const refining = refiningId === gift.id;
+                    const refineLabel = "Refine";
+                    const isLiked = likedEntries.some(
+                      (e) => e.gift.id === gift.id,
+                    );
+                    return (
+                      <li
+                        key={gift.id}
+                        className={`GiftCard${top ? " GiftCard--top" : ""}${refining ? " GiftCard--refining" : ""}`}
+                      >
+                        <div className="GiftCard__media">
+                          {top && (
+                            <div className="GiftCard__ribbon">Top pick</div>
+                          )}
+                          <ProductImage
+                            key={`${gift.id}-${product.id}`}
+                            searchQuery={imageSearchQuery}
+                            fallbackSrc={fallbackImage}
+                            usePexels={pexelsReady && !hasProductImage}
+                          />
+                        </div>
+                        <div className="GiftCard__body">
+                          {gift.categoryTitle && (
+                            <p className="GiftCard__category">
+                              {gift.categoryTitle}
+                            </p>
+                          )}
+                          <div className="GiftCard__head">
+                            <div>
+                              <h3 className="GiftCard__name">{product.name}</h3>
+                              <p className="GiftCard__blurb">{product.blurb}</p>
                             </div>
-
-                            <div className="GiftCard__want">
-                              <button
-                                type="button"
-                                className="Btn Btn--want"
-                                onClick={() => void handleWantThis(gift)}
-                                disabled={openingGiftId === gift.id}
-                              >
-                                {openingGiftId === gift.id
-                                  ? "Finding best store…"
-                                  : "I want this"}
-                              </button>
-                              <p className="GiftCard__wantHint">
-                                {groqReady
-                                  ? "Opens a shopping search picked for your region (smart routing when available)."
-                                  : "Opens Google Shopping to compare prices across stores."}
-                              </p>
-                              {wantThisErrorByGiftId[gift.id] && (
-                                <p className="RefineBlock__error" role="status">
-                                  {wantThisErrorByGiftId[gift.id]}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="GiftCard__controls">
-                              {multi && (
+                            <div className="GiftCard__scoreCol">
+                              <div className="GiftCard__votes">
                                 <button
                                   type="button"
-                                  className="Btn Btn--ghost Btn--small"
-                                  onClick={() => handleAlternate(gift)}
-                                  disabled={refining}
+                                  className={`VoteBtn VoteBtn--like${isLiked ? " VoteBtn--on" : ""}`}
+                                  onClick={() => toggleLikeGift(gift)}
+                                  aria-pressed={isLiked}
+                                  aria-label={isLiked ? "Unlike" : "Like"}
                                 >
-                                  Show another option in this category
+                                  <span className="VoteBtn__icon" aria-hidden>
+                                    👍
+                                  </span>
+                                  <span>{isLiked ? "Liked" : "Like"}</span>
                                 </button>
-                              )}
-                              <div className="RefineBlock">
-                                <label
-                                  className="FieldLabel"
-                                  htmlFor={`refine-${gift.id}`}
+                                <button
+                                  type="button"
+                                  className="VoteBtn VoteBtn--dislike"
+                                  onClick={() => dislikeGift(gift.id)}
+                                  aria-label="Dislike — hide this idea"
                                 >
-                                  Be more specific
-                                </label>
-                                <div className="RefineBlock__row">
-                                  <input
-                                    id={`refine-${gift.id}`}
-                                    className="Input Input--compact"
-                                    placeholder={refinePlaceholderForGift(
-                                      gift,
-                                      product,
-                                    )}
-                                    value={refineByGiftId[gift.id] ?? ""}
-                                    onChange={(e) =>
-                                      setRefineByGiftId((prev) => ({
-                                        ...prev,
-                                        [gift.id]: e.target.value,
-                                      }))
-                                    }
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        void handleRefine(gift);
-                                      }
-                                    }}
-                                    disabled={refining}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="Btn Btn--secondary Btn--small"
-                                    onClick={() => void handleRefine(gift)}
-                                    disabled={
-                                      refining ||
-                                      !refineByGiftId[gift.id]?.trim()
-                                    }
-                                  >
-                                    {refining ? "Thinking…" : refineLabel}
-                                  </button>
-                                </div>
-                                <p className="RefineBlock__hint">
-                                  {groqReady
-                                    ? result.source === "groq"
-                                      ? "Picks the variant on this card that best matches your note (or keyword matching if smart refine isn’t available)."
-                                      : "Reads your note and chooses the best option from this card’s catalog list."
-                                    : "On-device keyword matching picks a variant from this list."}
-                                </p>
-                                {groqNoteByGiftId[gift.id] && (
-                                  <p className="RefineBlock__aiNote">
-                                    <strong>Note:</strong>{" "}
-                                    {groqNoteByGiftId[gift.id]}
-                                  </p>
-                                )}
-                                {refineErrorByGiftId[gift.id] && (
-                                  <p
-                                    className="RefineBlock__error"
-                                    role="status"
-                                  >
-                                    {refineErrorByGiftId[gift.id]}
-                                  </p>
-                                )}
+                                  <span className="VoteBtn__icon" aria-hidden>
+                                    👎
+                                  </span>
+                                  <span>Dislike</span>
+                                </button>
                               </div>
-                            </div>
-
-                            <div className="Retailers">
-                              <h4 className="Retailers__title">
-                                Shop this product (search)
-                              </h4>
-                              <div className="Retailers__grid">
-                                {links.map((link) => (
-                                  <a
-                                    key={link.id}
-                                    className="RetailerLink"
-                                    href={link.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    {link.label}
-                                  </a>
-                                ))}
+                              <div className="GiftCard__score">
+                                <span className="GiftCard__price">
+                                  {formatMoney(priceLocal, currency)}
+                                </span>
+                                {isGroupRecipient && (
+                                  <span className="GiftCard__priceMeta">
+                                    total for {safeGroupSize} people (
+                                    {formatMoney(eachLocal, currency)} each)
+                                  </span>
+                                )}
+                                <span className="GiftCard__rating">
+                                  {product.rating.toFixed(1)}{" "}
+                                  <Stars value={product.rating} />
+                                </span>
                               </div>
-                            </div>
-
-                            <div className="Reviews">
-                              <h4 className="Reviews__title">
-                                {gift._aiGenerated
-                                  ? "Buyer-style reviews"
-                                  : "What buyers often say"}
-                              </h4>
-                              <p className="Reviews__disclaimer">
-                                {gift._aiGenerated
-                                  ? "Sample reviews typical of marketplace listings—always open the seller’s page to read verified feedback before you buy."
-                                  : "Representative comments for this product type—each store shows real, verified reviews on the listing."}
-                              </p>
-                              <ul className="Reviews__list">
-                                {product.reviews.map((rev, i) => (
-                                  <li key={i} className="Review">
-                                    <div className="Review__meta">
-                                      <Stars value={rev.stars} />
-                                      <span className="Review__author">
-                                        {rev.author}
-                                      </span>
-                                    </div>
-                                    <p className="Review__text">{rev.text}</p>
-                                  </li>
-                                ))}
-                              </ul>
                             </div>
                           </div>
-                        </li>
-                      );
-                    })}
+
+                          <div className="GiftCard__want">
+                            <button
+                              type="button"
+                              className="Btn Btn--want"
+                              onClick={() => void handleWantThis(gift)}
+                              disabled={openingGiftId === gift.id}
+                            >
+                              {openingGiftId === gift.id
+                                ? "Finding best store…"
+                                : "I want this"}
+                            </button>
+                            <p className="GiftCard__wantHint">
+                              {groqReady
+                                ? "Opens a shopping search picked for your region (smart routing when available)."
+                                : "Opens Google Shopping to compare prices across stores."}
+                            </p>
+                            {wantThisErrorByGiftId[gift.id] && (
+                              <p className="RefineBlock__error" role="status">
+                                {wantThisErrorByGiftId[gift.id]}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="GiftCard__controls">
+                            {multi && (
+                              <button
+                                type="button"
+                                className="Btn Btn--ghost Btn--small"
+                                onClick={() => handleAlternate(gift)}
+                                disabled={refining}
+                              >
+                                Show another option in this category
+                              </button>
+                            )}
+                            <div className="RefineBlock">
+                              <label
+                                className="FieldLabel"
+                                htmlFor={`refine-${gift.id}`}
+                              >
+                                Be more specific
+                              </label>
+                              <div className="RefineBlock__row">
+                                <input
+                                  id={`refine-${gift.id}`}
+                                  className="Input Input--compact"
+                                  placeholder={refinePlaceholderForGift(
+                                    gift,
+                                    product,
+                                  )}
+                                  value={refineByGiftId[gift.id] ?? ""}
+                                  onChange={(e) =>
+                                    setRefineByGiftId((prev) => ({
+                                      ...prev,
+                                      [gift.id]: e.target.value,
+                                    }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void handleRefine(gift);
+                                    }
+                                  }}
+                                  disabled={refining}
+                                />
+                                <button
+                                  type="button"
+                                  className="Btn Btn--secondary Btn--small"
+                                  onClick={() => void handleRefine(gift)}
+                                  disabled={
+                                    refining || !refineByGiftId[gift.id]?.trim()
+                                  }
+                                >
+                                  {refining ? "Thinking…" : refineLabel}
+                                </button>
+                              </div>
+                              <p className="RefineBlock__hint">
+                                {groqReady
+                                  ? result.source === "groq"
+                                    ? "Picks the variant on this card that best matches your note (or keyword matching if smart refine isn’t available)."
+                                    : "Reads your note and chooses the best option from this card’s catalog list."
+                                  : "On-device keyword matching picks a variant from this list."}
+                              </p>
+                              {groqNoteByGiftId[gift.id] && (
+                                <p className="RefineBlock__aiNote">
+                                  <strong>Note:</strong>{" "}
+                                  {groqNoteByGiftId[gift.id]}
+                                </p>
+                              )}
+                              {refineErrorByGiftId[gift.id] && (
+                                <p className="RefineBlock__error" role="status">
+                                  {refineErrorByGiftId[gift.id]}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="Retailers">
+                            <h4 className="Retailers__title">
+                              Shop this product (search)
+                            </h4>
+                            <div className="Retailers__grid">
+                              {links.map((link) => (
+                                <a
+                                  key={link.id}
+                                  className="RetailerLink"
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {link.label}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="Reviews">
+                            <h4 className="Reviews__title">
+                              {gift._aiGenerated
+                                ? "Buyer-style reviews"
+                                : "What buyers often say"}
+                            </h4>
+                            <p className="Reviews__disclaimer">
+                              {gift._aiGenerated
+                                ? "Sample reviews typical of marketplace listings—always open the seller’s page to read verified feedback before you buy."
+                                : "Representative comments for this product type—each store shows real, verified reviews on the listing."}
+                            </p>
+                            <ul className="Reviews__list">
+                              {product.reviews.map((rev, i) => (
+                                <li key={i} className="Review">
+                                  <div className="Review__meta">
+                                    <Stars value={rev.stars} />
+                                    <span className="Review__author">
+                                      {rev.author}
+                                    </span>
+                                  </div>
+                                  <p className="Review__text">{rev.text}</p>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
 
                 {caseOpen && (
