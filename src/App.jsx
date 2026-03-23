@@ -503,7 +503,16 @@ function isSubscriptionLikeGift(gift, product) {
   );
 }
 
-function ProductImage({ searchQuery, fallbackSrc }) {
+function buildImageSearchQuery(product, gift) {
+  const base = `${product?.name ?? ""} ${gift?.categoryTitle ?? ""}`.trim();
+  const normalized = base
+    .replace(/\bmousepad\b/gi, "mouse pad")
+    .replace(/\bheadset\b/gi, "headphones")
+    .replace(/\bkeycap\b/gi, "keyboard keycap");
+  return `${normalized} product photo`.trim();
+}
+
+function ProductImage({ searchQuery, fallbackSrc, usePexels = true }) {
   const safeFallback = fallbackSrc || DEFAULT_GIFT_IMAGE_URL;
   const fallbackRef = useRef(safeFallback);
   fallbackRef.current = safeFallback;
@@ -514,7 +523,7 @@ function ProductImage({ searchQuery, fallbackSrc }) {
   useEffect(() => {
     const gen = ++loadGenRef.current;
     setSrc(safeFallback);
-    if (!isPexelsConfigured()) return;
+    if (!usePexels || !isPexelsConfigured()) return;
     let cancelled = false;
     fetchPexelsImageUrl(searchQuery)
       .then((url) => {
@@ -526,7 +535,7 @@ function ProductImage({ searchQuery, fallbackSrc }) {
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, safeFallback]);
+  }, [searchQuery, safeFallback, usePexels]);
 
   function handleImgError() {
     setSrc((prev) => {
@@ -2309,8 +2318,10 @@ export default function App() {
                           )
                         : resolveGiftImage({ id: gift.id }, gift._sourceHobbyId);
 
-                      // Keep the query focused so Pexels returns the actual item type.
-                      const imageSearchQuery = `${product.name} ${gift.categoryTitle || ""}`.trim();
+                      // Prefer vendor/catalog image when available; only use stock photo
+                      // lookup for items that don't provide a concrete image.
+                      const hasProductImage = Boolean(product.image);
+                      const imageSearchQuery = buildImageSearchQuery(product, gift);
                       const links = getRetailerLinks(product.name, countryCode);
                       const multi = gift.variants.length > 1;
                       const refining = refiningId === gift.id;
@@ -2331,6 +2342,7 @@ export default function App() {
                               key={`${gift.id}-${product.id}`}
                               searchQuery={imageSearchQuery}
                               fallbackSrc={fallbackImage}
+                              usePexels={pexelsReady && !hasProductImage}
                             />
                           </div>
                           <div className="GiftCard__body">

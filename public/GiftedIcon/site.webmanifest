@@ -1,0 +1,21 @@
+{
+  "name": "Gifting, made effortless",
+  "short_name": "Gifted",
+  "icons": [
+    {
+      "src": "/GiftedIcon/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/GiftedIcon/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#303030",
+  "background_color": "#161616",
+  "display": "standalone"
+}
