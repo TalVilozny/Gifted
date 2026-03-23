@@ -1255,7 +1255,7 @@ h4 {
 
 .GiftedLogo {
   display: flex;
-  gap: 15px;
+  gap: 8px;
 
   align-items: center;
 }
@@ -1509,6 +1509,67 @@ h4 {
   margin-bottom: 1.25rem;
 }
 
+.HobbyFilter {
+  margin: 0 0 1.15rem;
+}
+
+.HobbyFilter__label {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.HobbyFilter__strip {
+  margin: 0;
+}
+
+.HobbyFilter__chip--active {
+  border-color: rgba(201, 162, 39, 0.65);
+  background: rgba(201, 162, 39, 0.1);
+}
+
+.DiyTutorials {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.DiyTutorials__title {
+  margin: 0 0 0.45rem;
+  font-size: 1.05rem;
+}
+
+.DiyTutorials__lead {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.DiyTutorials__list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.DiyTutorials__item {
+  margin: 0;
+}
+
+.DiyTutorials__link {
+  color: #ede9fe;
+  font-weight: 600;
+}
+
+.DiyTutorials__note {
+  margin: 0.2rem 0 0;
+  color: #ddd6fe;
+  font-size: 0.86rem;
+}
+
 .LikedSection {
   margin-bottom: 1.75rem;
   padding: 1rem 1.1rem;
@@ -1675,11 +1736,7 @@ h4 {
   margin: 0 0 1.1rem;
   border-radius: var(--radius-md);
   border: 1px solid rgba(201, 162, 39, 0.28);
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.35),
-    rgba(0, 0, 0, 0.55)
-  );
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55));
   overflow: hidden;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
 }
@@ -1717,20 +1774,12 @@ h4 {
 
 .CaseViewport__glow--left {
   left: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(201, 162, 39, 0.2),
-    transparent
-  );
+  background: linear-gradient(90deg, rgba(201, 162, 39, 0.2), transparent);
 }
 
 .CaseViewport__glow--right {
   right: 0;
-  background: linear-gradient(
-    270deg,
-    rgba(139, 92, 246, 0.2),
-    transparent
-  );
+  background: linear-gradient(270deg, rgba(139, 92, 246, 0.2), transparent);
 }
 
 .CaseViewport__marker {
