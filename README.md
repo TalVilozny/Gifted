@@ -1,16 +1,72 @@
-# React + Vite
+# Tal Vilozny – Gifted 🎁
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, intelligent gift-finding web app that helps you discover the perfect present based on who you're buying for.
 
-Currently, two official plugins are available:
+Gifted simplifies the gifting process by generating personalized recommendations using inputs like age, interests, and relationship—while allowing you to refine suggestions and explore better matches in seconds.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🚀 Live Demo
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+👉 https://getgifted.vercel.app
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🧠 About the Project
+
+Gifted was built to remove the guesswork from gifting.
+
+Instead of endlessly searching for ideas, users answer a few simple questions and receive tailored gift suggestions. The experience is interactive and flexible, allowing users to refine results and explore better options until they find the perfect match.
+
+The platform supports both individual and group gifting, making it useful for a wide range of real-world scenarios.
+
+---
+
+## ✨ Features
+
+- 🎯 Personalized gift recommendations based on user input
+- 👥 Supports gifting for individuals and groups
+- 🔄 Ability to refine and improve suggestions dynamically
+- ⚡ Fast and responsive user experience
+- 🎨 Clean, modern UI with strong UX focus
+- 📱 Fully responsive and mobile-friendly
+- 🌐 Deployed and continuously updated on Vercel
+
+---
+
+## 🛠 Tech Stack
+
+- **Framework:** Next.js (React)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **Deployment:** Vercel
+- **Design:** Figma
+
+---
+
+## 📈 Future Improvements
+
+- Save and share gift suggestions
+- User accounts and personalization history
+- More advanced filtering and categories
+- Enhanced recommendation logic
+- UI/UX refinements and animations
+
+---
+
+## 📌 Inspiration
+
+Gifted was created to solve a common problem: finding meaningful gifts quickly and confidently.
+
+The focus was on combining simplicity with smart logic to create an experience that feels both helpful and intuitive.
+
+---
+
+## 📬 Contact
+
+If you’d like to connect, collaborate, or give feedback:
+
+- GitHub: https://github.com/TalVilozny
+- Portfolio: https://talvilozny.vercel.app
+
+---
