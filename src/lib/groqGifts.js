@@ -94,7 +94,7 @@ function primaryHobbyKey(selectedHobbyIds, customLabels) {
   return "general";
 }
 
-function formatRecipientMeta(recipientId, recipientAgeRange) {
+function formatRecipientMeta(recipientId, recipientAgeRange, recipientGroupSize = null) {
   const rel =
     typeof recipientId === "string" && recipientId.trim()
       ? recipientId.trim()
@@ -105,7 +105,39 @@ function formatRecipientMeta(recipientId, recipientAgeRange) {
       : "";
   if (!rel && !age) return "";
   const bits = [];
-  if (rel) bits.push(`Who: ${rel}`);
+
+  if (rel.startsWith("group-")) {
+    // Format: group-{groupKind}-{composition}
+    const parts = rel.split("-");
+    const kindId = parts[1] ?? "group";
+    const composition = parts[2] ?? "mixed";
+
+    const kindLabel =
+      kindId === "workmates"
+        ? "workmates"
+        : kindId === "party"
+          ? "party guests"
+          : kindId === "family"
+            ? "family"
+            : kindId === "friends"
+              ? "friends"
+              : kindId === "team"
+                ? "team"
+                : kindId === "class"
+                  ? "class"
+                  : kindId;
+
+    const compLabel =
+      composition === "male"
+        ? "all men"
+        : composition === "female"
+          ? "all women"
+          : "mixed group";
+
+    bits.push(`Who: ${kindLabel} (${compLabel})`);
+  } else if (rel) {
+    bits.push(`Who: ${rel}`);
+  }
   if (age) {
     const n = Number(age);
     bits.push(
@@ -113,6 +145,9 @@ function formatRecipientMeta(recipientId, recipientAgeRange) {
         ? `Age: ${n} years`
         : `Age: ${age}`,
     );
+  }
+  if (typeof recipientGroupSize === "number" && Number.isFinite(recipientGroupSize)) {
+    bits.push(`Group size: ${Math.max(2, Math.round(recipientGroupSize))}`);
   }
   return `- ${bits.join(" | ")}\n`;
 }
@@ -130,6 +165,7 @@ function formatRecipientMeta(recipientId, recipientAgeRange) {
  *   budgetUnlimited?: boolean,
  *   recipientId?: string | null,
  *   recipientAgeRange?: string | null,
+ *   recipientGroupSize?: number | null,
  * }} params
  */
 export async function rankGiftsWithGroq({
@@ -143,8 +179,12 @@ export async function rankGiftsWithGroq({
   budgetUnlimited = false,
   recipientId = null,
   recipientAgeRange = null,
+  recipientGroupSize = null,
 }) {
   if (!isGroqConfigured() || !gifts.length) return null;
+
+  const isGroup = typeof recipientId === "string" && recipientId.startsWith("group-");
+  const reorderTarget = isGroup ? "this group" : "this person";
 
   let pool = gifts;
   if (budgetUnlimited) {
@@ -170,8 +210,14 @@ export async function rankGiftsWithGroq({
 
   if (options.length === 0) return null;
 
-  const genderLabel =
-    gender === "male"
+  const groupComposition = isGroup ? String(recipientId).split("-").at(-1) : null;
+  const genderLabel = isGroup
+    ? groupComposition === "male"
+      ? "a group of men"
+      : groupComposition === "female"
+        ? "a group of women"
+        : "a mixed group of people"
+    : gender === "male"
       ? "a man"
       : gender === "female"
         ? "a woman"
@@ -198,7 +244,11 @@ export async function rankGiftsWithGroq({
         ? "- Gift preference: **Experiences & memories** — tickets, classes, spa, trips, workshops, vouchers, memberships—prioritize things they *do*, not only objects.\n"
         : "- Gift preference: **Ready-made products** — finished, shoppable items they unwrap.\n";
 
-  const recipientMeta = formatRecipientMeta(recipientId, recipientAgeRange);
+  const recipientMeta = formatRecipientMeta(
+    recipientId,
+    recipientAgeRange,
+    recipientGroupSize,
+  );
 
   const prompt = `You are an expert gift advisor.
 
@@ -206,7 +256,7 @@ User context:
 - Gifts for: ${genderLabel}
 ${recipientMeta}- Interests (hobbies): ${JSON.stringify([...hobbyTitles, ...customLabels])}
 ${budgetLine}${prefLine}
-Reorder the gift options from MOST exciting and memorable to still-good, best overall fit for this person.
+Reorder the gift options from MOST exciting and memorable to still-good, best overall fit for ${reorderTarget}.
 
 Guidance:
 - Prefer **variety**: do not rank five similar small accessories at the top when the list includes bigger or more distinctive gifts for the same hobby.
@@ -259,11 +309,20 @@ export async function generateGiftIdeasWithGroq({
   selectedHobbyIds = [],
   recipientId = null,
   recipientAgeRange = null,
+  recipientGroupSize = null,
 }) {
   if (!isGroqConfigured()) return null;
 
-  const genderLabel =
-    gender === "male"
+  const isGroup = typeof recipientId === "string" && recipientId.startsWith("group-");
+  const groupComposition = isGroup ? recipientId.split("-").at(-1) : null;
+
+  const genderLabel = isGroup
+    ? groupComposition === "male"
+      ? "a group of men"
+      : groupComposition === "female"
+        ? "a group of women"
+        : "a mixed group of people"
+    : gender === "male"
       ? "a man"
       : gender === "female"
         ? "a woman"
@@ -307,7 +366,11 @@ CRITICAL — **Ready-made products** they unwrap:
 - Set "diy": false unless the product is explicitly a commercial kit they assemble at home.
 `;
 
-  const recipientMeta = formatRecipientMeta(recipientId, recipientAgeRange);
+  const recipientMeta = formatRecipientMeta(
+    recipientId,
+    recipientAgeRange,
+    recipientGroupSize,
+  );
 
   const prompt = `You are a creative gift curator. Invent concrete, shoppable gift ideas (specific product styles, not vague categories).
 

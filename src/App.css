@@ -290,6 +290,18 @@ h4 {
   margin-top: 1.5rem;
 }
 
+.GroupSizeRow {
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.GroupSizeRow__input {
+  max-width: 12rem;
+}
+
 .ChoiceCard {
   display: flex;
   flex-direction: column;
@@ -312,6 +324,12 @@ h4 {
   border-color: rgba(201, 162, 39, 0.45);
   background: rgba(201, 162, 39, 0.06);
   transform: translateY(-2px);
+}
+
+.ChoiceCard--selected {
+  border-color: rgba(201, 162, 39, 0.65);
+  background: rgba(201, 162, 39, 0.1);
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.22);
 }
 
 .ChoiceCard:focus-visible {
@@ -859,6 +877,7 @@ h4 {
 .Banner--info {
   background: rgba(99, 102, 241, 0.1);
   border-color: rgba(129, 140, 248, 0.28);
+  margin-top: 20px;
 }
 
 .Banner--ranking {
@@ -1135,6 +1154,13 @@ h4 {
   font-size: 1.2rem;
   font-family: "DM Serif Display", Georgia, serif;
   color: var(--text);
+}
+
+.GiftCard__priceMeta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.4;
 }
 
 .GiftCard__rating {

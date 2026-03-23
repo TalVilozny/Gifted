@@ -125,6 +125,11 @@ export function getRetailerLinks(productName, countryCode) {
       url: `https://www.asos.com/search/?q=${enc}`,
     },
     {
+      id: "ebay",
+      label: "eBay",
+      url: `https://www.ebay.com/sch/i.html?_nkw=${enc}`,
+    },
+    {
       id: "shopping",
       label: "Google Shopping",
       url: `https://www.google.com/search?tbm=shop&q=${enc}`,

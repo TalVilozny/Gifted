@@ -94,6 +94,11 @@ const RECIPIENT_RELATIONS = [
 /** Slider bounds for age in years (who you’re gifting). */
 function ageLimitsForRecipient(recipientId) {
   if (!recipientId) return { min: 0, max: 100 };
+  if (typeof recipientId === "string" && recipientId.startsWith("group-")) {
+    // For group gifting we treat age as a broad range; users can still tune
+    // the slider and the prompt will include the exact age they pick.
+    return { min: 0, max: 100 };
+  }
   if (recipientId === "mom" || recipientId === "dad")
     return { min: 20, max: 100 };
   if (recipientId === "boyfriend" || recipientId === "girlfriend") {
@@ -110,8 +115,28 @@ const GENDER_OPTIONS = [
   { id: "other", label: "Other", hint: "Any / all", emoji: "♥" },
 ];
 
+const GROUP_KIND_OPTIONS = [
+  {
+    id: "workmates",
+    label: "Workmates",
+    hint: "Co-workers",
+    emoji: "🧑‍💼",
+  },
+  { id: "party", label: "Party", hint: "Celebration group", emoji: "🎉" },
+  { id: "family", label: "Family", hint: "Relatives & home", emoji: "🏡" },
+  { id: "friends", label: "Friends", hint: "Friend group", emoji: "🍻" },
+  { id: "class", label: "Class", hint: "School or class group", emoji: "🎓" },
+];
+
 /** @param {string | null} id */
 function recipientIdToGender(id) {
+  if (typeof id === "string" && id.startsWith("group-")) {
+    // Format: group-{groupKind}-{composition}
+    const composition = id.split("-").at(-1);
+    if (composition === "male") return "male";
+    if (composition === "female") return "female";
+    return "nonbinary";
+  }
   switch (id) {
     case "male":
     case "boyfriend":
@@ -135,6 +160,22 @@ function recipientIdToGender(id) {
 
 /** Short label for budget recap */
 function recipientRecapLabel(id) {
+  if (typeof id === "string" && id.startsWith("group-")) {
+    const groupKind = id.split("-")[1] ?? "group";
+    const pretty =
+      groupKind === "workmates"
+        ? "workmates"
+        : groupKind === "party"
+          ? "party"
+          : groupKind === "family"
+            ? "family"
+            : groupKind === "friends"
+              ? "friends"
+              : groupKind === "team"
+                ? "team"
+                : groupKind;
+    return `your ${pretty}`;
+  }
   switch (id) {
     case "boyfriend":
       return "your boyfriend";
@@ -345,7 +386,8 @@ const CASE_ITEM_PX = 152;
 const CASE_CYCLES = 52;
 /** Slightly longer than CSS transition (4.6s) so `transitionend` can win. */
 const CASE_TRANSITION_FALLBACK_MS = 5600;
-const PRIVACY_HASH = "#/privacy-policy";
+const APP_PATH = "/Gifted";
+const PRIVACY_PATH = "/Gifted/privacy-policy";
 const DIY_TUTORIAL_BUDGET_MAX_USD = 60;
 const DIY_TUTORIALS = [
   {
@@ -368,9 +410,10 @@ const DIY_TUTORIALS = [
   },
 ];
 
-function getPageFromHash() {
+function getPageFromLocation() {
   if (typeof window === "undefined") return "app";
-  return window.location.hash === PRIVACY_HASH ? "privacy" : "app";
+  const p = window.location.pathname.replace(/\/+$/, "") || "/";
+  return p === PRIVACY_PATH ? "privacy" : "app";
 }
 
 function ProductImage({ searchQuery, fallbackSrc }) {
@@ -420,11 +463,16 @@ function ProductImage({ searchQuery, fallbackSrc }) {
 }
 
 export default function App() {
-  const [pageMode, setPageMode] = useState(getPageFromHash);
+  const [pageMode, setPageMode] = useState(getPageFromLocation);
   const [step, setStep] = useState("who");
+  const [audienceMode, setAudienceMode] = useState(null);
   const [recipientId, setRecipientId] = useState(null);
   /** Age in years (constrained by relationship — see `ageLimits`). */
   const [recipientAgeYears, setRecipientAgeYears] = useState(25);
+  /** Group gifting selections (only used when `audienceMode === "group"`). */
+  const [groupKindId, setGroupKindId] = useState(null);
+  const [groupGenderMode, setGroupGenderMode] = useState(null); // 'male' | 'female' | 'mixed'
+  const [groupSize, setGroupSize] = useState(4);
   /** @type {'diy' | 'experience' | 'premade' | null} */
   const [giftPreference, setGiftPreference] = useState(null);
   /** @type {{ key: string, gift: object }[]} */
@@ -483,9 +531,23 @@ export default function App() {
     return budgetSlider * rate;
   }, [budgetSlider, currency]);
 
+  const isGroupRecipient = useMemo(
+    () => typeof recipientId === "string" && recipientId.startsWith("group-"),
+    [recipientId],
+  );
+  const safeGroupSize = useMemo(
+    () => Math.max(2, Number.isFinite(groupSize) ? Math.round(groupSize) : 2),
+    [groupSize],
+  );
+  const recommendationBudgetUsd = useMemo(() => {
+    if (budgetUnlimited) return budgetUsd;
+    if (!isGroupRecipient) return budgetUsd;
+    return budgetUsd / safeGroupSize;
+  }, [budgetUnlimited, budgetUsd, isGroupRecipient, safeGroupSize]);
+
   const effectiveBudgetUsd = useMemo(
-    () => (budgetUnlimited ? Infinity : budgetUsd),
-    [budgetUnlimited, budgetUsd],
+    () => (budgetUnlimited ? Infinity : recommendationBudgetUsd),
+    [budgetUnlimited, recommendationBudgetUsd],
   );
 
   const budgetInCurrency = budgetSlider;
@@ -531,12 +593,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    function syncPageFromHash() {
-      setPageMode(getPageFromHash());
+    function syncPageFromLocation() {
+      setPageMode(getPageFromLocation());
     }
-    window.addEventListener("hashchange", syncPageFromHash);
-    syncPageFromHash();
-    return () => window.removeEventListener("hashchange", syncPageFromHash);
+    // Backward compatibility: if someone lands on old hash routes, normalize once.
+    if (window.location.hash === "#Gifted/privacy-policy") {
+      window.history.replaceState(null, "", PRIVACY_PATH);
+    } else if (window.location.hash === "#Gifted") {
+      window.history.replaceState(null, "", APP_PATH);
+    }
+    window.addEventListener("popstate", syncPageFromLocation);
+    syncPageFromLocation();
+    return () => window.removeEventListener("popstate", syncPageFromLocation);
   }, []);
 
   function cancelBudgetRangeAnimation() {
@@ -585,6 +653,16 @@ export default function App() {
     setStep("age");
   }
 
+  function pickGroup(kindId, composition) {
+    setGroupKindId(kindId);
+    setGroupGenderMode(composition);
+    const recipient = `group-${kindId}-${composition}`;
+    setRecipientId(recipient);
+    const lim = ageLimitsForRecipient(recipient);
+    setRecipientAgeYears(Math.min(lim.max, Math.max(lim.min, 25)));
+    setStep("age");
+  }
+
   const ageLimits = useMemo(
     () => ageLimitsForRecipient(recipientId),
     [recipientId],
@@ -621,13 +699,14 @@ export default function App() {
           hobbyTitles,
           customLabels: customHobbies,
           gender,
-          budgetUSD: budgetUsd,
+          budgetUSD: recommendationBudgetUsd,
           wantDIY: giftPref === "diy",
           giftPreference: giftPref,
           budgetUnlimited,
           selectedHobbyIds,
           recipientId,
           recipientAgeRange: String(recipientAgeYears),
+          recipientGroupSize: isGroupRecipient ? safeGroupSize : null,
         });
         if (ai?.gifts?.length) {
           rec = { gifts: ai.gifts, mode: "in", source: "groq" };
@@ -642,7 +721,7 @@ export default function App() {
         selectedHobbyIds,
         customLabels: customHobbies,
         gender,
-        budgetUSD: budgetUsd,
+        budgetUSD: recommendationBudgetUsd,
         wantDIY: giftPref === "diy",
         giftPreference: giftPref,
         budgetUnlimited,
@@ -656,12 +735,13 @@ export default function App() {
             hobbyTitles,
             customLabels: customHobbies,
             gender,
-            budgetUSD: budgetUnlimited ? null : budgetUsd,
+            budgetUSD: budgetUnlimited ? null : recommendationBudgetUsd,
             wantDIY: giftPref === "diy",
             giftPreference: giftPref,
             budgetUnlimited,
             recipientId,
             recipientAgeRange: String(recipientAgeYears),
+            recipientGroupSize: isGroupRecipient ? safeGroupSize : null,
           });
           if (ranked?.gifts?.length) {
             let ordered = ranked.gifts;
@@ -809,8 +889,12 @@ export default function App() {
 
   function restart() {
     setStep("who");
+    setAudienceMode(null);
     setRecipientId(null);
     setRecipientAgeYears(25);
+    setGroupKindId(null);
+    setGroupGenderMode(null);
+    setGroupSize(4);
     setGiftPreference(null);
     setLikedEntries([]);
     setDislikedIds([]);
@@ -840,11 +924,12 @@ export default function App() {
   }
 
   function openPrivacyPolicy() {
-    window.location.hash = PRIVACY_HASH;
+    window.history.pushState(null, "", PRIVACY_PATH);
+    setPageMode("privacy");
   }
 
   function openGiftPickerHome() {
-    if (window.location.hash) window.location.hash = "#/";
+    window.history.pushState(null, "", APP_PATH);
     setPageMode("app");
   }
 
@@ -950,7 +1035,7 @@ export default function App() {
       const ai = await refineWithGroq({
         variants: gift.variants,
         userQuery: text,
-        budgetUSD: budgetUnlimited ? Infinity : budgetUsd,
+        budgetUSD: budgetUnlimited ? Infinity : recommendationBudgetUsd,
         categoryTitle: gift.categoryTitle,
         budgetUnlimited,
       });
@@ -1123,49 +1208,225 @@ export default function App() {
               <section className="Panel fade-in" aria-labelledby="who-title">
                 <p className="Eyebrow">Step 1</p>
                 <h2 id="who-title" className="Panel__title">
-                  Who you&rsquo;re gifting
+                  Picking a gift for a person or a group
                 </h2>
                 <p className="Panel__lead">
-                  Pick a relationship, <strong>or</strong> describe them by
-                  gender—then we&rsquo;ll ask their age so ideas fit their stage
-                  of life.
+                  Choose whether you&rsquo;re gifting one person or a group. Then
+                  we&rsquo;ll ask for age so recommendations fit.
                 </p>
-                <p className="FieldLabel WhoSection__label">Relationship</p>
-                <div className="ChoiceRow ChoiceRow--relations">
-                  {RECIPIENT_RELATIONS.map((r) => (
+                {audienceMode == null && (
+                  <div className="ChoiceRow ChoiceRow--relations">
                     <button
-                      key={r.id}
                       type="button"
                       className="ChoiceCard"
-                      onClick={() => pickRecipient(r.id)}
+                      onClick={() => setAudienceMode("person")}
                     >
                       <span className="ChoiceCard__emoji" aria-hidden>
-                        {r.emoji}
+                        🎯
                       </span>
-                      <span className="ChoiceCard__label">{r.label}</span>
-                      <span className="ChoiceCard__hint">{r.hint}</span>
+                      <span className="ChoiceCard__label">
+                        Picking gift for a person
+                      </span>
+                      <span className="ChoiceCard__hint">
+                        Choose a relative or gender
+                      </span>
                     </button>
-                  ))}
-                </div>
-                <p className="FieldLabel WhoSection__label WhoSection__label--spaced">
-                  Or by gender
-                </p>
-                <div className="ChoiceRow ChoiceRow--gender">
-                  {GENDER_OPTIONS.map((g) => (
                     <button
-                      key={g.id}
                       type="button"
                       className="ChoiceCard"
-                      onClick={() => pickRecipient(g.id)}
+                      onClick={() => setAudienceMode("group")}
                     >
                       <span className="ChoiceCard__emoji" aria-hidden>
-                        {g.emoji}
+                        👥
                       </span>
-                      <span className="ChoiceCard__label">{g.label}</span>
-                      <span className="ChoiceCard__hint">{g.hint}</span>
+                      <span className="ChoiceCard__label">
+                        Picking gift for a group
+                      </span>
+                      <span className="ChoiceCard__hint">
+                        Pick the group and composition
+                      </span>
                     </button>
-                  ))}
-                </div>
+                  </div>
+                )}
+
+                {audienceMode === "person" && (
+                  <>
+                    <p className="FieldLabel WhoSection__label">Relationship</p>
+                    <div className="ChoiceRow ChoiceRow--relations">
+                      {RECIPIENT_RELATIONS.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className="ChoiceCard"
+                          onClick={() => pickRecipient(r.id)}
+                        >
+                          <span className="ChoiceCard__emoji" aria-hidden>
+                            {r.emoji}
+                          </span>
+                          <span className="ChoiceCard__label">{r.label}</span>
+                          <span className="ChoiceCard__hint">{r.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="FieldLabel WhoSection__label WhoSection__label--spaced">
+                      Or by gender
+                    </p>
+                    <div className="ChoiceRow ChoiceRow--gender">
+                      {GENDER_OPTIONS.map((g) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          className="ChoiceCard"
+                          onClick={() => pickRecipient(g.id)}
+                        >
+                          <span className="ChoiceCard__emoji" aria-hidden>
+                            {g.emoji}
+                          </span>
+                          <span className="ChoiceCard__label">{g.label}</span>
+                          <span className="ChoiceCard__hint">{g.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="Panel__actions">
+                      <button
+                        type="button"
+                        className="Btn Btn--ghost"
+                        onClick={() => {
+                          setAudienceMode(null);
+                          setRecipientId(null);
+                        }}
+                      >
+                        Back
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {audienceMode === "group" && (
+                  <>
+                    <p className="FieldLabel WhoSection__label">Which group?</p>
+                    <div className="ChoiceRow ChoiceRow--relations">
+                      {GROUP_KIND_OPTIONS.map((g) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          className={`ChoiceCard${groupKindId === g.id ? " ChoiceCard--selected" : ""}`}
+                          aria-pressed={groupKindId === g.id}
+                          onClick={() => setGroupKindId(g.id)}
+                        >
+                          <span className="ChoiceCard__emoji" aria-hidden>
+                            {g.emoji}
+                          </span>
+                          <span className="ChoiceCard__label">{g.label}</span>
+                          <span className="ChoiceCard__hint">{g.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <p className="FieldLabel WhoSection__label WhoSection__label--spaced">
+                      Group composition
+                    </p>
+                    <div className="ChoiceRow ChoiceRow--gender">
+                      <button
+                        type="button"
+                        className={`ChoiceCard${groupGenderMode === "male" ? " ChoiceCard--selected" : ""}`}
+                        aria-pressed={groupGenderMode === "male"}
+                        onClick={() => setGroupGenderMode("male")}
+                      >
+                        <span className="ChoiceCard__emoji" aria-hidden>
+                          ♂️
+                        </span>
+                        <span className="ChoiceCard__label">All male</span>
+                        <span className="ChoiceCard__hint">Same-gender group</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`ChoiceCard${groupGenderMode === "female" ? " ChoiceCard--selected" : ""}`}
+                        aria-pressed={groupGenderMode === "female"}
+                        onClick={() => setGroupGenderMode("female")}
+                      >
+                        <span className="ChoiceCard__emoji" aria-hidden>
+                          ♀️
+                        </span>
+                        <span className="ChoiceCard__label">All female</span>
+                        <span className="ChoiceCard__hint">Same-gender group</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`ChoiceCard${groupGenderMode === "mixed" ? " ChoiceCard--selected" : ""}`}
+                        aria-pressed={groupGenderMode === "mixed"}
+                        onClick={() => setGroupGenderMode("mixed")}
+                      >
+                        <span className="ChoiceCard__emoji" aria-hidden>
+                          ⚧
+                        </span>
+                        <span className="ChoiceCard__label">Mixed group</span>
+                        <span className="ChoiceCard__hint">Men and women</span>
+                      </button>
+                    </div>
+                    <div className="GroupSizeRow">
+                      <label className="FieldLabel" htmlFor="group-size">
+                        How many people are in the group?
+                      </label>
+                      <input
+                        id="group-size"
+                        type="number"
+                        min={2}
+                        step={1}
+                        className="Input GroupSizeRow__input"
+                        value={groupSize}
+                        onChange={(e) => {
+                          const raw = Number(e.target.value);
+                          if (!Number.isFinite(raw)) return;
+                          setGroupSize(Math.max(2, Math.round(raw)));
+                        }}
+                      />
+                    </div>
+                    {(groupKindId || groupGenderMode) && (
+                      <p className="Banner Banner--info" role="status">
+                        Selected:{" "}
+                        <strong>
+                          {groupKindId
+                            ? GROUP_KIND_OPTIONS.find((x) => x.id === groupKindId)?.label
+                            : "Choose group"}
+                        </strong>{" "}
+                        ·{" "}
+                        <strong>
+                          {groupGenderMode === "male"
+                            ? "All male"
+                            : groupGenderMode === "female"
+                              ? "All female"
+                              : groupGenderMode === "mixed"
+                                ? "Mixed group"
+                                : "Choose composition"}
+                        </strong>
+                      </p>
+                    )}
+
+                    <div className="Panel__actions">
+                      <button
+                        type="button"
+                        className="Btn Btn--ghost"
+                        onClick={() => {
+                          setAudienceMode(null);
+                          setRecipientId(null);
+                          setGroupKindId(null);
+                          setGroupGenderMode(null);
+                        }}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        className="Btn Btn--primary"
+                        disabled={!groupKindId || !groupGenderMode || safeGroupSize < 2}
+                        onClick={() => pickGroup(groupKindId, groupGenderMode)}
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </>
+                )}
               </section>
             )}
 
@@ -1185,7 +1446,10 @@ export default function App() {
                       ? " Partners: ages 15–100."
                       : recipientId === "kid"
                         ? " Kids: ages 0–17."
-                        : " Ages 0–100."}
+                        : typeof recipientId === "string" &&
+                            recipientId.startsWith("group-")
+                          ? " Group members: ages 0–100."
+                          : " Ages 0–100."}
                 </p>
                 <div className="AgeSlider">
                   <div
@@ -1617,6 +1881,23 @@ export default function App() {
                         <strong>
                           {formatMoney(budgetInCurrency, currency)}
                         </strong>
+                        {isGroupRecipient && (
+                          <>
+                            {" "}
+                            total for <strong>{safeGroupSize}</strong> people (
+                            ~
+                            <strong>
+                              {formatMoney(
+                                usdToCurrency(
+                                  recommendationBudgetUsd,
+                                  currency,
+                                ),
+                                currency,
+                              )}
+                            </strong>{" "}
+                            each)
+                          </>
+                        )}
                         .
                       </>
                     )}
@@ -1782,7 +2063,10 @@ export default function App() {
                       {likedEntries.map((entry) => {
                         const lg = entry.gift;
                         const lp = lg.selectedProduct;
-                        const lpLocal = usdToCurrency(lp.priceUSD, currency);
+                        const lpTotalUsd = isGroupRecipient
+                          ? lp.priceUSD * safeGroupSize
+                          : lp.priceUSD;
+                        const lpLocal = usdToCurrency(lpTotalUsd, currency);
                         return (
                           <li key={entry.key} className="LikedSection__item">
                             <div>
@@ -1791,6 +2075,9 @@ export default function App() {
                               </span>
                               <span className="LikedSection__price">
                                 {formatMoney(lpLocal, currency)}
+                                {isGroupRecipient && (
+                                  <> total for {safeGroupSize} people</>
+                                )}
                               </span>
                             </div>
                             <button
@@ -1827,10 +2114,11 @@ export default function App() {
                 <ul className="GiftList">
                   {visibleShortlistGifts.map((gift, index) => {
                       const product = displayProduct(gift);
-                      const priceLocal = usdToCurrency(
-                        product.priceUSD,
-                        currency,
-                      );
+                      const giftTotalUsd = isGroupRecipient
+                        ? product.priceUSD * safeGroupSize
+                        : product.priceUSD;
+                      const priceLocal = usdToCurrency(giftTotalUsd, currency);
+                      const eachLocal = usdToCurrency(product.priceUSD, currency);
                       const top = index === 0;
                       // When Pexels isn't configured, avoid the catalog's illustrative images
                       // (they can be mismatched). When it is configured, Pexels will replace
@@ -1911,6 +2199,11 @@ export default function App() {
                                   <span className="GiftCard__price">
                                     {formatMoney(priceLocal, currency)}
                                   </span>
+                              {isGroupRecipient && (
+                                <span className="GiftCard__priceMeta">
+                                  total for {safeGroupSize} people ({formatMoney(eachLocal, currency)} each)
+                                </span>
+                              )}
                                   <span className="GiftCard__rating">
                                     {product.rating.toFixed(1)}{" "}
                                     <Stars value={product.rating} />
@@ -2186,7 +2479,7 @@ export default function App() {
         </section>
         <p className="Footer__copyright">
           © 2026 Tal Vilozny. All rights reserved. •{" "}
-          <a className="Footer__link" href={PRIVACY_HASH}>
+          <a className="Footer__link" href={PRIVACY_PATH}>
             Privacy Policy
           </a>
         </p>
