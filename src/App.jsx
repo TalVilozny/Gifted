@@ -397,6 +397,18 @@ const DIY_TUTORIALS = [
     url: "https://www.youtube.com/watch?v=Aq86i-Qt1AQ&pp=ygURZGl5IHJvc2VzIGJvdXF1ZXQ%3D",
   },
   {
+    id: "love-letter-ideas",
+    title: "Custom love letter ideas and format",
+    note: "Turn simple paper and a pen into a personal keepsake gift.",
+    url: "https://www.youtube.com/results?search_query=custom+love+letter+ideas+gift",
+  },
+  {
+    id: "love-letter-calligraphy",
+    title: "Calligraphy-style love letter tutorial",
+    note: "Make your letter look premium with simple calligraphy tips.",
+    url: "https://www.youtube.com/results?search_query=love+letter+calligraphy+tutorial",
+  },
+  {
     id: "memory-jar",
     title: "DIY memory jar gift",
     note: "Low-cost and personal: notes, memories, and small keepsakes.",
@@ -408,7 +420,66 @@ const DIY_TUTORIALS = [
     note: "Budget-friendly paper craft that still feels thoughtful.",
     url: "https://www.youtube.com/results?search_query=origami+flower+gift+tutorial",
   },
+  {
+    id: "handmade-card",
+    title: "Handmade pop-up card",
+    note: "A custom card with a pop-up element for birthdays or anniversaries.",
+    url: "https://www.youtube.com/results?search_query=handmade+pop+up+card+tutorial",
+  },
+  {
+    id: "photo-collage-box",
+    title: "Explosion box photo collage gift",
+    note: "A memorable DIY box filled with photos and short messages.",
+    url: "https://www.youtube.com/results?search_query=explosion+box+photo+gift+tutorial",
+  },
+  {
+    id: "coupon-book",
+    title: "DIY romantic coupon book",
+    note: "Create personalized coupons for dates, favors, and fun moments.",
+    url: "https://www.youtube.com/results?search_query=diy+coupon+book+gift",
+  },
+  {
+    id: "paper-bouquet",
+    title: "DIY paper flower bouquet",
+    note: "A handmade bouquet with colored paper and basic craft tools.",
+    url: "https://www.youtube.com/results?search_query=diy+paper+flower+bouquet",
+  },
+  {
+    id: "scrapbook-mini",
+    title: "Mini scrapbook gift tutorial",
+    note: "A compact scrapbook with photos, captions, and keepsake pages.",
+    url: "https://www.youtube.com/results?search_query=mini+scrapbook+gift+tutorial",
+  },
+  {
+    id: "bracelet-handmade",
+    title: "Handmade bracelet gift",
+    note: "Simple DIY jewelry idea with thread or beads.",
+    url: "https://www.youtube.com/results?search_query=handmade+bracelet+gift+tutorial",
+  },
+  {
+    id: "candle-diy",
+    title: "DIY scented candle gift",
+    note: "Budget candle-making gift with custom scents and jar labels.",
+    url: "https://www.youtube.com/results?search_query=diy+scented+candle+gift",
+  },
+  {
+    id: "gift-box-assembly",
+    title: "How to make a handmade gift box",
+    note: "Build a custom gift box and presentation from craft paper.",
+    url: "https://www.youtube.com/results?search_query=handmade+gift+box+tutorial",
+  },
 ];
+
+function pickRandomTutorialIds(allItems, count, previousIds = []) {
+  if (!Array.isArray(allItems) || allItems.length === 0) return [];
+  const n = Math.max(1, Math.min(count, allItems.length));
+  const prev = new Set(previousIds);
+
+  const fresh = allItems.filter((x) => !prev.has(x.id));
+  const pool = fresh.length >= n ? fresh : allItems;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n).map((x) => x.id);
+}
 
 function getPageFromLocation() {
   if (typeof window === "undefined") return "app";
@@ -489,6 +560,9 @@ export default function App() {
   const [groupKindId, setGroupKindId] = useState(null);
   const [groupGenderMode, setGroupGenderMode] = useState(null); // 'male' | 'female' | 'mixed'
   const [groupSize, setGroupSize] = useState(4);
+  const [groupSizeText, setGroupSizeText] = useState("");
+  const [isGroupSizeEditing, setIsGroupSizeEditing] = useState(false);
+  const [diyTutorialIds, setDiyTutorialIds] = useState([]);
   /** @type {'diy' | 'experience' | 'premade' | null} */
   const [giftPreference, setGiftPreference] = useState(null);
   /** @type {{ key: string, gift: object }[]} */
@@ -555,6 +629,12 @@ export default function App() {
     () => Math.max(2, Number.isFinite(groupSize) ? Math.round(groupSize) : 2),
     [groupSize],
   );
+  const groupSizeInputValid = useMemo(() => {
+    const raw = groupSizeText.trim();
+    if (raw === "") return false;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 2;
+  }, [groupSizeText]);
   const recommendationBudgetUsd = useMemo(() => {
     if (budgetUnlimited) return budgetUsd;
     if (!isGroupRecipient) return budgetUsd;
@@ -576,6 +656,11 @@ export default function App() {
     if (isBudgetAmountEditing) return;
     setBudgetAmountText(String(Math.round(budgetInCurrency)));
   }, [budgetUnlimited, isBudgetAmountEditing, budgetInCurrency]);
+
+  useEffect(() => {
+    if (isGroupSizeEditing) return;
+    setGroupSizeText(String(safeGroupSize));
+  }, [isGroupSizeEditing, safeGroupSize]);
 
   const maxDisplay = useMemo(
     () => usdToCurrency(BUDGET_MAX_USD, currency),
@@ -674,6 +759,10 @@ export default function App() {
     setStep("age");
   }
 
+  function scrollToTopNow() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function pickGroup(kindId, composition) {
     setGroupKindId(kindId);
     setGroupGenderMode(composition);
@@ -681,6 +770,7 @@ export default function App() {
     setRecipientId(recipient);
     const lim = ageLimitsForRecipient(recipient);
     setRecipientAgeYears(Math.min(lim.max, Math.max(lim.min, 25)));
+    scrollToTopNow();
     setStep("age");
   }
 
@@ -704,7 +794,13 @@ export default function App() {
   }, [recipientAgeYears, ageLimits.min, ageLimits.max]);
 
   function continueFromAge() {
+    scrollToTopNow();
     setStep("passion");
+  }
+
+  function continueFromPassion() {
+    scrollToTopNow();
+    setStep("budget");
   }
 
   async function fetchRecommendationsCore() {
@@ -800,6 +896,9 @@ export default function App() {
 
     const rec = await fetchRecommendationsCore();
     setResult(stampGiftIdsForResult(rec));
+    if (giftPref === "diy") {
+      setDiyTutorialIds((prev) => pickRandomTutorialIds(DIY_TUTORIALS, 3, prev));
+    }
     setStep("results");
   }
 
@@ -814,6 +913,11 @@ export default function App() {
     try {
       const rec = await fetchRecommendationsCore();
       setResult(stampGiftIdsForResult(rec));
+      if (giftPref === "diy") {
+        setDiyTutorialIds((prev) =>
+          pickRandomTutorialIds(DIY_TUTORIALS, 3, prev),
+        );
+      }
     } finally {
       setIsReloading(false);
     }
@@ -916,6 +1020,9 @@ export default function App() {
     setGroupKindId(null);
     setGroupGenderMode(null);
     setGroupSize(4);
+    setGroupSizeText("");
+    setIsGroupSizeEditing(false);
+    setDiyTutorialIds([]);
     setGiftPreference(null);
     setLikedEntries([]);
     setDislikedIds([]);
@@ -1010,6 +1117,13 @@ export default function App() {
       budgetUsd <= DIY_TUTORIAL_BUDGET_MAX_USD,
     [giftPref, budgetUnlimited, budgetUsd],
   );
+
+  const visibleDiyTutorials = useMemo(() => {
+    const byId = new Map(DIY_TUTORIALS.map((x) => [x.id, x]));
+    const picked = diyTutorialIds.map((id) => byId.get(id)).filter(Boolean);
+    if (picked.length > 0) return picked;
+    return DIY_TUTORIALS.slice(0, 3);
+  }, [diyTutorialIds]);
 
   const recapParts = [...selectedHobbyLabels, ...customHobbies];
 
@@ -1399,11 +1513,20 @@ export default function App() {
                         min={2}
                         step={1}
                         className="Input GroupSizeRow__input"
-                        value={groupSize}
+                        value={groupSizeText}
                         onChange={(e) => {
-                          const raw = Number(e.target.value);
-                          if (!Number.isFinite(raw)) return;
-                          setGroupSize(Math.max(2, Math.round(raw)));
+                          const raw = e.target.value;
+                          setGroupSizeText(raw);
+                          if (raw === "") return;
+                          const n = Number(raw);
+                          if (!Number.isFinite(n)) return;
+                          setGroupSize(Math.max(2, Math.round(n)));
+                        }}
+                        onFocus={() => setIsGroupSizeEditing(true)}
+                        onBlur={() => {
+                          setIsGroupSizeEditing(false);
+                          if (groupSizeText.trim() !== "") return;
+                          setGroupSizeText(String(safeGroupSize));
                         }}
                       />
                     </div>
@@ -1444,7 +1567,12 @@ export default function App() {
                       <button
                         type="button"
                         className="Btn Btn--primary"
-                        disabled={!groupKindId || !groupGenderMode || safeGroupSize < 2}
+                        disabled={
+                          !groupKindId ||
+                          !groupGenderMode ||
+                          safeGroupSize < 2 ||
+                          !groupSizeInputValid
+                        }
                         onClick={() => pickGroup(groupKindId, groupGenderMode)}
                       >
                         Continue
@@ -1747,7 +1875,7 @@ export default function App() {
                     type="button"
                     className="Btn Btn--primary"
                     disabled={!hasPassions || !giftPreference}
-                    onClick={() => setStep("budget")}
+                    onClick={continueFromPassion}
                   >
                     Continue
                   </button>
@@ -2066,7 +2194,7 @@ export default function App() {
                       here are tutorials for handmade gifts.
                     </p>
                     <ul className="DiyTutorials__list">
-                      {DIY_TUTORIALS.map((item) => (
+                      {visibleDiyTutorials.map((item) => (
                         <li key={item.id} className="DiyTutorials__item">
                           <a
                             className="DiyTutorials__link"
