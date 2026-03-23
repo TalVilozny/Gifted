@@ -128,6 +128,95 @@ h4 {
   color: var(--muted);
 }
 
+.Footer__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.15rem 1.5rem;
+}
+
+.Footer__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: center;
+  text-align: center;
+}
+
+.Footer__title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+  font-family: "DM Serif Display", Georgia, serif;
+}
+
+.Footer__line {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.Footer__link {
+  color: #d4d4d8;
+  text-decoration: none;
+  width: fit-content;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.Footer__link:hover {
+  border-color: rgba(201, 162, 39, 0.55);
+}
+
+.FooterNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.Footer__linkButton {
+  font: inherit;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.Footer__disclaimer {
+  margin: 1.35rem 0 0;
+  line-height: 1.55;
+}
+
+.Footer__copyright {
+  margin: 1.35rem 0 0;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--muted);
+}
+
+.PrivacyPage__content {
+  display: grid;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #d4d4d8;
+}
+
+.PrivacyPage__content h3 {
+  margin: 0.75rem 0 0.1rem;
+  font-size: 1.05rem;
+  font-family: "Inter", sans-serif;
+  color: var(--text);
+}
+
+.PrivacyPage__content p {
+  margin: 0;
+}
+
+.PrivacyPage__content a {
+  color: #e9d5ff;
+}
+
 .Panel {
   background: var(--bg-elevated);
   backdrop-filter: blur(20px);
@@ -1710,6 +1799,7 @@ h4 {
   text-align: center;
   color: #e4e4e7;
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;

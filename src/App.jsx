@@ -345,6 +345,12 @@ const CASE_ITEM_PX = 152;
 const CASE_CYCLES = 52;
 /** Slightly longer than CSS transition (4.6s) so `transitionend` can win. */
 const CASE_TRANSITION_FALLBACK_MS = 5600;
+const PRIVACY_HASH = "#/privacy-policy";
+
+function getPageFromHash() {
+  if (typeof window === "undefined") return "app";
+  return window.location.hash === PRIVACY_HASH ? "privacy" : "app";
+}
 
 function ProductImage({ searchQuery, fallbackSrc }) {
   const safeFallback = fallbackSrc || DEFAULT_GIFT_IMAGE_URL;
@@ -393,6 +399,7 @@ function ProductImage({ searchQuery, fallbackSrc }) {
 }
 
 export default function App() {
+  const [pageMode, setPageMode] = useState(getPageFromHash);
   const [step, setStep] = useState("who");
   const [recipientId, setRecipientId] = useState(null);
   /** Age in years (constrained by relationship — see `ageLimits`). */
@@ -488,6 +495,15 @@ export default function App() {
         cancelAnimationFrame(budgetAnimateRafRef.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    function syncPageFromHash() {
+      setPageMode(getPageFromHash());
+    }
+    window.addEventListener("hashchange", syncPageFromHash);
+    syncPageFromHash();
+    return () => window.removeEventListener("hashchange", syncPageFromHash);
   }, []);
 
   function cancelBudgetRangeAnimation() {
@@ -783,6 +799,15 @@ export default function App() {
     cancelBudgetRangeAnimation();
   }
 
+  function openPrivacyPolicy() {
+    window.location.hash = PRIVACY_HASH;
+  }
+
+  function openGiftPickerHome() {
+    if (window.location.hash) window.location.hash = "#/";
+    setPageMode("app");
+  }
+
   function addCustomHobby() {
     const t = customInput.trim();
     if (!t) return;
@@ -945,13 +970,13 @@ export default function App() {
   }
 
   return (
-    <div className="Shell">
+    <div className="Shell" id="top">
       <div className="Shell__glow" aria-hidden />
       <header className="Header">
         <button
           type="button"
           className="GiftedLogo GiftedLogo--home"
-          onClick={restart}
+          onClick={() => (pageMode === "privacy" ? openGiftPickerHome() : restart())}
           aria-label="Start over"
         >
           <img src={GiftedIcon} alt="" className="GiftedIcon" />
@@ -960,14 +985,66 @@ export default function App() {
             <h3>Gifting, made effortless</h3>
           </div>
         </button>
-        {step !== "who" && step !== "thinking" && (
+        {pageMode === "privacy" ? (
+          <button
+            type="button"
+            className="Btn Btn--ghost"
+            onClick={openGiftPickerHome}
+          >
+            Back to app
+          </button>
+        ) : (
+          step !== "who" &&
+          step !== "thinking" && (
           <button type="button" className="Btn Btn--ghost" onClick={restart}>
             Start over
           </button>
+          )
         )}
       </header>
 
-      <main className="Main">
+      <main className="Main" id="main-content">
+        {pageMode === "privacy" ? (
+          <section className="Panel fade-in PrivacyPage" aria-labelledby="privacy-title">
+            <p className="Eyebrow">Privacy policy</p>
+            <h2 id="privacy-title" className="Panel__title">
+              Privacy Policy
+            </h2>
+            <p className="Panel__lead">
+              Gifted is designed to suggest gift ideas from the options and preferences
+              you choose in the app.
+            </p>
+            <div className="PrivacyPage__content">
+              <h3>What data is used</h3>
+              <p>
+                We use the details you enter during this session, such as recipient type,
+                age, interests, budget, and selected options, to generate recommendations.
+              </p>
+              <h3>How it is used</h3>
+              <p>
+                This data is used only to power gift suggestions and related ranking or
+                refinement features while you are using the app.
+              </p>
+              <h3>External services</h3>
+              <p>
+                Some features may call third-party services (for example AI or image
+                providers). When those features are used, request data needed for that
+                feature may be sent to those services.
+              </p>
+              <h3>Retailer links</h3>
+              <p>
+                Retailer buttons open external shopping/search pages. Those websites have
+                their own privacy policies and terms.
+              </p>
+              <h3>Contact</h3>
+              <p>
+                For privacy questions, contact{" "}
+                <a href="mailto:TalVilozny@gmail.com">TalVilozny@gmail.com</a>.
+              </p>
+            </div>
+          </section>
+        ) : (
+          <>
         {step === "who" && (
           <section className="Panel fade-in" aria-labelledby="who-title">
             <p className="Eyebrow">Step 1</p>
@@ -1899,12 +1976,25 @@ export default function App() {
             </div>
           </section>
         )}
+          </>
+        )}
       </main>
 
       <footer className="Footer">
-        <p>
-          Illustrative prices and images; retailer links are searches, not
-          endorsements. Always read verified reviews on the listing you choose.
+        <section className="Footer__section">
+          <h4 className="Footer__title">Made by Tal Vilozny</h4>
+          <p className="Footer__line">
+            Frontend Developer crafting beautiful, performant web experiences
+          </p>
+          <a className="Footer__link" href="mailto:TalVilozny@gmail.com">
+            TalVilozny@gmail.com
+          </a>
+        </section>
+        <p className="Footer__copyright">
+          © 2026 Tal Vilozny. All rights reserved. •{" "}
+          <a className="Footer__link" href={PRIVACY_HASH}>
+            Privacy Policy
+          </a>
         </p>
       </footer>
     </div>
