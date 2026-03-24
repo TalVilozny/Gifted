@@ -1725,6 +1725,15 @@ export function inferHobbyIdsFromCustomLabels(labels) {
       out.push("cars");
     }
     if (
+      /\b(sim\s*racing|simracing|racing\s*sim|driving\s*sim|wheelbase|force\s*feedback|pedal\s*set|cockpit|bucket\s*seat|assetto|i\s*racing|iracing|gran\s*turismo|f1\s*sim)\b/.test(
+        low,
+      )
+    ) {
+      out.push("cars");
+      out.push("gaming");
+      out.push("pcbuilding");
+    }
+    if (
       /\b(makeup|beauty|cosmetic|skincare|nail|palette|lipstick|foundation|blush|glam)\b/.test(
         low,
       )

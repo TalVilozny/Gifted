@@ -617,6 +617,8 @@ export default function App() {
   const [giftPreference, setGiftPreference] = useState(null);
   /** @type {{ key: string, gift: object }[]} */
   const [likedEntries, setLikedEntries] = useState([]);
+  /** @type {{ key: string, gift: object, nameKey: string, sourceId: string }[]} */
+  const [dislikedEntries, setDislikedEntries] = useState([]);
   const [dislikedIds, setDislikedIds] = useState([]);
   const [isReloading, setIsReloading] = useState(false);
   const [caseOpen, setCaseOpen] = useState(false);
@@ -859,7 +861,25 @@ export default function App() {
   }
 
   async function fetchRecommendationsCore() {
-    const hobbyTitles = selectedHobbyIds
+    const normalizeGiftName = (s) =>
+      String(s || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    const blockedNames = new Set(
+      dislikedEntries.map((e) => normalizeGiftName(e?.gift?.selectedProduct?.name)),
+    );
+    const applyDislikeExclusions = (recIn) => {
+      if (!recIn?.gifts?.length || blockedNames.size === 0) return recIn;
+      const kept = recIn.gifts.filter((g) => {
+        const name = normalizeGiftName(g?.selectedProduct?.name);
+        return !name || !blockedNames.has(name);
+      });
+      return { ...recIn, gifts: kept };
+    };
+
+    const inferredIds = inferHobbyIdsFromCustomLabels(customHobbies);
+    const hobbyTitles = [...new Set([...selectedHobbyIds, ...inferredIds])]
       .map((id) => hobbies.find((h) => h.id === id)?.title)
       .filter(Boolean);
 
@@ -870,6 +890,7 @@ export default function App() {
         const ai = await generateGiftIdeasWithGroq({
           hobbyTitles,
           customLabels: customHobbies,
+          excludedProductNames: [...blockedNames],
           gender,
           budgetUSD: recommendationBudgetUsd,
           wantDIY: giftPref === "diy",
@@ -881,7 +902,11 @@ export default function App() {
           recipientGroupSize: isGroupRecipient ? safeGroupSize : null,
         });
         if (ai?.gifts?.length) {
-          rec = { gifts: ai.gifts, mode: "in", source: "groq" };
+          rec = applyDislikeExclusions({
+            gifts: ai.gifts,
+            mode: "in",
+            source: "groq",
+          });
         }
       } catch {
         /* fall through to catalog */
@@ -898,7 +923,7 @@ export default function App() {
         giftPreference: giftPref,
         budgetUnlimited,
       });
-      rec = { ...catalogRec, source: "catalog" };
+      rec = applyDislikeExclusions({ ...catalogRec, source: "catalog" });
 
       if (groqReady && rec.gifts.length > 0) {
         try {
@@ -925,7 +950,7 @@ export default function App() {
               );
               if (pr.length > 0) ordered = pr;
             }
-            rec = { ...rec, gifts: ordered };
+            rec = applyDislikeExclusions({ ...rec, gifts: ordered });
           }
         } catch {
           /* keep catalog order */
@@ -1022,6 +1047,34 @@ export default function App() {
     setDislikedIds((prev) =>
       prev.includes(giftId) ? prev : [...prev, giftId],
     );
+    const gift = result?.gifts?.find((g) => g.id === giftId);
+    if (!gift) return;
+    const clone = JSON.parse(JSON.stringify(gift));
+    const nameKey = String(clone.selectedProduct?.name || clone.id || "")
+      .toLowerCase()
+      .trim();
+    if (!nameKey) return;
+    setDislikedEntries((prev) => {
+      const existingIdx = prev.findIndex((e) => e.nameKey === nameKey);
+      if (existingIdx >= 0) {
+        const next = [...prev];
+        next[existingIdx] = {
+          ...next[existingIdx],
+          gift: clone,
+          sourceId: giftId,
+        };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          key: `dislike-${giftId}-${Date.now()}`,
+          gift: clone,
+          nameKey,
+          sourceId: giftId,
+        },
+      ];
+    });
   }
 
   const caseStripItems = useMemo(() => {
@@ -1100,6 +1153,7 @@ export default function App() {
     setDiyTutorialIds([]);
     setGiftPreference(null);
     setLikedEntries([]);
+    setDislikedEntries([]);
     setDislikedIds([]);
     setCaseOpen(false);
     clearCaseFallbackTimer();
@@ -1166,19 +1220,13 @@ export default function App() {
   );
 
   const chosenHobbyFilterOptions = useMemo(() => {
-    const fromCustom = inferHobbyIdsFromCustomLabels(customHobbies);
-    const catalogIds = [...new Set([...selectedHobbyIds, ...fromCustom])];
-    const seenCatalog = new Set(catalogIds);
+    const catalogIds = [...new Set(selectedHobbyIds)];
     const options = catalogIds
       .map((id) => hobbies.find((h) => h.id === id))
       .filter(Boolean)
       .map((h) => ({ id: h.id, title: h.title, emoji: h.emoji }));
 
     for (const label of customHobbies) {
-      const inferred = inferHobbyIdsFromCustomLabels([label]);
-      const reinforcesShownCatalog =
-        inferred.length > 0 && inferred.some((hid) => seenCatalog.has(hid));
-      if (reinforcesShownCatalog) continue;
       options.push({
         id: customHobbyFilterId(label),
         title: label,
@@ -1193,17 +1241,155 @@ export default function App() {
     const customFilterLabel = parseCustomHobbyFilterId(activeHobbyFilterId);
     const customNeedle =
       customFilterLabel != null ? customFilterLabel.toLowerCase() : null;
-    return result.gifts
-      .filter((g) => !dislikedIds.includes(g.id))
-      .filter((g) => {
-        if (activeHobbyFilterId == null) return true;
-        if (g._sourceHobbyId === activeHobbyFilterId) return true;
-        if (customNeedle != null) {
-          return giftSearchTextForHobbyFilter(g).includes(customNeedle);
+    const customTokens =
+      customNeedle == null
+        ? []
+        : customNeedle
+            .split(/[^a-z0-9+]+/i)
+            .map((t) => t.trim())
+            .filter((t) => t.length >= 3);
+    const inferredCustomIds =
+      customFilterLabel == null
+        ? []
+        : inferHobbyIdsFromCustomLabels([customFilterLabel]);
+    const available = result.gifts.filter((g) => !dislikedIds.includes(g.id));
+    const stemToken = (t) =>
+      String(t || "")
+        .toLowerCase()
+        .replace(/(?:ing|ers|ies|es|s)$/i, "");
+    const customScoreForGift = (g) => {
+      if (customNeedle == null) return 0;
+      const hay = giftSearchTextForHobbyFilter(g);
+      const hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
+      let score = 0;
+      if (inferredCustomIds.includes(g._sourceHobbyId)) score += 8;
+      if (hay.includes(customNeedle)) score += 10;
+      if (customTokens.length > 0) {
+        for (const tok of customTokens) {
+          if (hay.includes(tok)) score += 4;
+          const tokStem = stemToken(tok);
+          if (!tokStem) continue;
+          if (hayWords.some((w) => stemToken(w) === tokStem)) score += 3;
+          if (
+            hayWords.some(
+              (w) =>
+                w.startsWith(tokStem) ||
+                tokStem.startsWith(w) ||
+                w.includes(tokStem),
+            )
+          ) {
+            score += 2;
+          }
         }
-        return false;
+      }
+      return score;
+    };
+
+    const filtered = available.filter((g) => {
+      if (activeHobbyFilterId == null) return true;
+      if (g._sourceHobbyId === activeHobbyFilterId) return true;
+      if (customNeedle != null) {
+        return customScoreForGift(g) > 0;
+      }
+      return false;
+    });
+    if (customNeedle != null && filtered.length === 0) {
+      const closest = available
+        .map((g) => ({ g, score: customScoreForGift(g) }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.g)
+        .slice(0, 8);
+      if (closest.length > 0) return closest;
+      if (selectedHobbyIds.length === 0 && customHobbies.length > 0) {
+        return available;
+      }
+    }
+    return filtered;
+  }, [
+    result,
+    dislikedIds,
+    activeHobbyFilterId,
+    selectedHobbyIds.length,
+    customHobbies.length,
+  ]);
+
+  const showCustomOnlyFallbackBanner = useMemo(() => {
+    if (!result?.gifts?.length) return false;
+    if (selectedHobbyIds.length > 0 || customHobbies.length === 0) return false;
+    const label = parseCustomHobbyFilterId(activeHobbyFilterId);
+    if (!label) return false;
+    const available = result.gifts.filter((g) => !dislikedIds.includes(g.id));
+    if (available.length === 0) return false;
+    const inferred = inferHobbyIdsFromCustomLabels([label]);
+    const needle = label.toLowerCase();
+    const tokens = needle
+      .split(/[^a-z0-9+]+/i)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 3);
+    const stemToken = (t) =>
+      String(t || "")
+        .toLowerCase()
+        .replace(/(?:ing|ers|ies|es|s)$/i, "");
+    const hasMatch = available.some((g) => {
+      if (inferred.includes(g._sourceHobbyId)) return true;
+      const hay = giftSearchTextForHobbyFilter(g);
+      if (hay.includes(needle)) return true;
+      const hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
+      return tokens.some((tok) => {
+        if (hay.includes(tok)) return true;
+        const tokStem = stemToken(tok);
+        if (!tokStem) return false;
+        return hayWords.some(
+          (w) =>
+            stemToken(w) === tokStem ||
+            w.startsWith(tokStem) ||
+            tokStem.startsWith(w) ||
+            w.includes(tokStem),
+        );
       });
-  }, [result, dislikedIds, activeHobbyFilterId]);
+    });
+    if (hasMatch) return false;
+    return visibleShortlistGifts.length > 0;
+  }, [
+    result,
+    dislikedIds,
+    activeHobbyFilterId,
+    selectedHobbyIds.length,
+    customHobbies.length,
+    visibleShortlistGifts.length,
+  ]);
+
+  const customFilterNoMatchMessage = useMemo(() => {
+    const label = parseCustomHobbyFilterId(activeHobbyFilterId);
+    if (!label || !result?.gifts?.length) return null;
+
+    const available = result.gifts.filter((g) => !dislikedIds.includes(g.id));
+    if (available.length === 0) {
+      return "You have disliked all current gifts. Remove a dislike or click More ideas.";
+    }
+
+    const inferred = inferHobbyIdsFromCustomLabels([label]);
+    const needle = label.toLowerCase();
+    const tokens = needle
+      .split(/[^a-z0-9+]+/i)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 3);
+    const hasMatch = available.some((g) => {
+      if (inferred.includes(g._sourceHobbyId)) return true;
+      const hay = giftSearchTextForHobbyFilter(g);
+      if (hay.includes(needle)) return true;
+      return tokens.some((tok) => hay.includes(tok));
+    });
+    if (hasMatch) return null;
+
+    if (!budgetUnlimited && result.mode === "stretch") {
+      return `No strong matches for "${label}" at this budget yet. Try increasing budget or click More ideas.`;
+    }
+    return `No current gifts strongly match "${label}" yet. Try broader wording for this hobby or click More ideas for a fresh Groq set.`;
+  }, [activeHobbyFilterId, result, dislikedIds, budgetUnlimited]);
+
+  const dislikedGiftRows = dislikedEntries;
 
   const showDiyTutorials = useMemo(
     () =>
@@ -1381,22 +1567,68 @@ export default function App() {
             <h3>Gifting, made effortless</h3>
           </div>
         </button>
-        {pageMode === "privacy" ? (
-          <button
-            type="button"
-            className="Btn Btn--ghost"
-            onClick={openGiftPickerHome}
-          >
-            Back to app
-          </button>
-        ) : (
-          step !== "who" &&
-          step !== "thinking" && (
-            <button type="button" className="Btn Btn--ghost" onClick={restart}>
-              Start over
+        <div className="Header__actions">
+          {pageMode === "privacy" ? (
+            <button
+              type="button"
+              className="Btn Btn--ghost"
+              onClick={openGiftPickerHome}
+            >
+              Back to app
             </button>
-          )
-        )}
+          ) : (
+            step !== "who" &&
+            step !== "thinking" && (
+              <button type="button" className="Btn Btn--ghost" onClick={restart}>
+                Start over
+              </button>
+            )
+          )}
+
+          {pageMode !== "privacy" &&
+            step === "results" &&
+            dislikedGiftRows.length > 0 && (
+              <div className="DislikesManager" role="region" aria-label="Manage dislikes">
+                <div className="DislikesManager__summary">
+                  Manage dislikes ({dislikedGiftRows.length})
+                </div>
+                <ul className="DislikesManager__list">
+                  {dislikedGiftRows.map((entry) => {
+                    const gift = entry.gift;
+                    const product = displayProduct(gift);
+                    const totalUsd = isGroupRecipient
+                      ? product.priceUSD * safeGroupSize
+                      : product.priceUSD;
+                    const priceLocal = usdToCurrency(totalUsd, currency);
+                    return (
+                      <li key={entry.key} className="DislikesManager__item">
+                        <div className="DislikesManager__meta">
+                          <span className="DislikesManager__name">{product.name}</span>
+                          <span className="DislikesManager__price">
+                            {formatApproxGiftPrice(priceLocal, currency)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="Btn Btn--ghost Btn--small"
+                          onClick={() => {
+                            setDislikedIds((prev) =>
+                              prev.filter((id) => id !== entry.sourceId),
+                            );
+                            setDislikedEntries((prev) =>
+                              prev.filter((x) => x.key !== entry.key),
+                            );
+                          }}
+                        >
+                          Remove dislike
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+        </div>
       </header>
 
       <main className="Main" id="main-content">
@@ -1466,7 +1698,7 @@ export default function App() {
                         🎯
                       </span>
                       <span className="ChoiceCard__label">
-                        Picking gift for a person
+                        Picking a gift for a person
                       </span>
                       <span className="ChoiceCard__hint">
                         Choose a relative or gender
@@ -1481,7 +1713,7 @@ export default function App() {
                         👥
                       </span>
                       <span className="ChoiceCard__label">
-                        Picking gift for a group
+                        Picking a gift for a group
                       </span>
                       <span className="ChoiceCard__hint">
                         Pick the group and composition
@@ -2398,11 +2630,24 @@ export default function App() {
 
                 {visibleShortlistGifts.length === 0 &&
                   activeHobbyFilterId != null &&
+                  dislikedIds.length > 0 &&
                   result.gifts.length > 0 && (
                     <p className="Banner" role="status">
                       No gifts match this hobby after your dislikes.
                     </p>
                   )}
+                {visibleShortlistGifts.length === 0 &&
+                  customFilterNoMatchMessage && (
+                    <p className="Banner Banner--info" role="status">
+                      {customFilterNoMatchMessage}
+                    </p>
+                  )}
+                {showCustomOnlyFallbackBanner && (
+                  <p className="Banner Banner--info" role="status">
+                    No gift suggestions matched the selected hobbies, so
+                    showing other available gifts.
+                  </p>
+                )}
 
                 <ul className="GiftList">
                   {visibleShortlistGifts.map((gift, index) => {

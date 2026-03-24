@@ -87,6 +87,7 @@ h4 {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 2rem;
+  z-index: 12;
 }
 
 .Header__brand {
@@ -122,6 +123,62 @@ h4 {
   font-size: 0.9rem;
   color: var(--muted);
   font-family: "Inter", sans-serif;
+}
+
+.Header__actions {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+
+.DislikesManager {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 6;
+  width: min(420px, 92vw);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.DislikesManager__summary {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.86rem;
+  color: var(--muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.DislikesManager__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.55rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.DislikesManager__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.DislikesManager__name {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.DislikesManager__price {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .Main {

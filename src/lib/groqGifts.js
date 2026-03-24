@@ -309,6 +309,7 @@ ${JSON.stringify(options, null, 2)}`;
 export async function generateGiftIdeasWithGroq({
   hobbyTitles,
   customLabels,
+  excludedProductNames = [],
   gender,
   budgetUSD,
   wantDIY = false,
@@ -339,6 +340,10 @@ export async function generateGiftIdeasWithGroq({
           : "a person";
 
   const hobbyKey = primaryHobbyKey(selectedHobbyIds, customLabels);
+  const customOnlyNoMapped =
+    (selectedHobbyIds?.length ?? 0) === 0 &&
+    (customLabels?.length ?? 0) > 0 &&
+    inferHobbyIdsFromCustomLabels(customLabels).length === 0;
 
   const budgetInstruction = budgetUnlimited
     ? `Budget: UNLIMITED — include impressive premium ideas when they fit (flagship GPUs, prebuilt workstations, pro tools, luxury experiences). Use realistic US retail ballparks in priceUSD.`
@@ -374,6 +379,24 @@ CRITICAL — **Ready-made products** they unwrap:
 - Set "diy": false unless the product is explicitly a commercial kit they assemble at home.
 `;
 
+  const customOnlySection = customOnlyNoMapped
+    ? `
+CRITICAL — **Custom-hobby focus is mandatory**:
+- The user provided free-text hobbies not mapped to stock buckets: ${JSON.stringify(customLabels)}.
+- Every gift must clearly tie back to these custom hobbies in name/blurb/tags.
+- Avoid generic fallback ideas (e.g. plain “experience gift card”, generic cash-equivalent cards, unrelated home gifts) unless explicitly tied to the custom hobby context.
+`
+    : "";
+
+  const excludedSection =
+    excludedProductNames.length > 0
+      ? `
+CRITICAL — **Avoid disliked repeats**:
+- Do NOT suggest gifts with the same/similar product names as these previously disliked items:
+${JSON.stringify(excludedProductNames.slice(0, 60))}
+`
+      : "";
+
   const recipientMeta = formatRecipientMeta(
     recipientId,
     recipientAgeRange,
@@ -388,6 +411,8 @@ Primary hobby bucket (for theming): ${hobbyKey}
 
 ${budgetInstruction}
 ${preferenceSection}
+${customOnlySection}
+${excludedSection}
 
 Rules:
 - Return exactly 18 objects in "gifts" (fewer only if impossible—prefer 18).
