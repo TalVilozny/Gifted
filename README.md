@@ -37,7 +37,7 @@ The platform supports both individual and group gifting, making it useful for a 
 ## 🛠 Tech Stack
 
 - **Framework:** Next.js (React)
-- **Language:** TypeScript
+- **Language:** JavaScript
 - **Styling:** Tailwind CSS
 - **Deployment:** Vercel
 - **Design:** Figma
@@ -66,7 +66,7 @@ The focus was on combining simplicity with smart logic to create an experience t
 
 If you’d like to connect, collaborate, or give feedback:
 
-- GitHub: https://github.com/TalVilozny
+- Linkedin: https://www.linkedin.com/in/tal-vilozny-frontend/
 - Portfolio: https://talvilozny.vercel.app
 
 ---
