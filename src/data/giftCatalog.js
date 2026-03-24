@@ -1,6 +1,10 @@
 /** Base prices in USD; UI converts for display. */
 
-import { expandGiftRow, pickBestVariantForBudget } from "./productEngine.js";
+import {
+  expandGiftRow,
+  pickBestVariantForBudget,
+  pickBestVariantForBudgetScored,
+} from "./productEngine.js";
 
 export const CURRENCIES = [
   { code: "USD", label: "US Dollar", symbol: "$" },
@@ -1752,6 +1756,51 @@ export function inferHobbyIdsFromCustomLabels(labels) {
   return [...new Set(out)];
 }
 
+function tokenizePickTerms(s) {
+  return String(s || "")
+    .toLowerCase()
+    .split(/[^a-z0-9+]+/i)
+    .filter((t) => t.length > 2);
+}
+
+/**
+ * Hobby “groups” for deterministic picks: each preset hobby, each custom label,
+ * and inferred catalog hobbies from custom text (deduped).
+ * @param {string[]} selectedHobbyIds
+ * @param {string[]} customLabels
+ */
+export function buildPickContext(selectedHobbyIds, customLabels) {
+  const groups = [];
+  const seenKeys = new Set();
+
+  function addGroup(terms) {
+    const cleaned = [...new Set(terms.filter(Boolean))].filter(
+      (t) => t.length > 2,
+    );
+    if (!cleaned.length) return;
+    const key = [...cleaned].sort().join("\u0001");
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+    groups.push({ terms: cleaned });
+  }
+
+  for (const id of selectedHobbyIds || []) {
+    const h = hobbies.find((x) => x.id === id);
+    if (!h) continue;
+    addGroup(tokenizePickTerms(`${h.title} ${h.subtitle} ${h.id}`));
+  }
+  for (const label of customLabels || []) {
+    addGroup(tokenizePickTerms(label));
+  }
+  const inferred = inferHobbyIdsFromCustomLabels(customLabels || []);
+  for (const hid of inferred) {
+    if ((selectedHobbyIds || []).includes(hid)) continue;
+    const h = hobbies.find((x) => x.id === hid);
+    if (h) addGroup(tokenizePickTerms(`${h.title} ${h.subtitle} ${h.id}`));
+  }
+  return { groups };
+}
+
 const MAX_RESULTS = 18;
 
 /** Minimum price (USD) for non-luxury rows when "endless budget" is on — avoids $68 skillets. */
@@ -1830,10 +1879,18 @@ function rowMaxRating(g) {
   return g.rating ?? 0;
 }
 
-export function finalizeGiftRow(g, budgetUSD, sourceHobbyId, budgetUnlimited) {
+export function finalizeGiftRow(
+  g,
+  budgetUSD,
+  sourceHobbyId,
+  budgetUnlimited,
+  pickContext = null,
+) {
   const expanded = expandGiftRow(g);
   const cap = budgetUnlimited ? Infinity : budgetUSD;
-  const selected = pickBestVariantForBudget(expanded.variants, cap);
+  const selected = pickContext?.groups?.length
+    ? pickBestVariantForBudgetScored(expanded.variants, cap, pickContext)
+    : pickBestVariantForBudget(expanded.variants, cap);
   return {
     ...expanded,
     _sourceHobbyId: sourceHobbyId,
@@ -1863,6 +1920,7 @@ export function getRecommendations({
   budgetUnlimited = false,
 }) {
   const pref = giftPreference ?? (wantDIY ? "diy" : "premade");
+  const pickContext = buildPickContext(selectedHobbyIds, customLabels);
   const inferred = inferHobbyIdsFromCustomLabels(customLabels);
   const hobbyKeys = [...new Set([...selectedHobbyIds, ...inferred])];
 
@@ -1937,7 +1995,7 @@ export function getRecommendations({
   }
 
   let finalized = eligible.map((g) =>
-    finalizeGiftRow(g, budgetUSD, g._sourceHobbyId, budgetUnlimited),
+    finalizeGiftRow(g, budgetUSD, g._sourceHobbyId, budgetUnlimited, pickContext),
   );
 
   if (budgetUnlimited) {
@@ -1953,40 +2011,92 @@ export function getRecommendations({
 
   const fits = finalized.filter((f) => f._inBudget);
   const pool = fits.length ? fits : finalized;
-  const sorted = sortGiftsByBudgetFit(pool, budgetUSD, budgetUnlimited);
+  const sorted = sortGiftsByBudgetFit(
+    pool,
+    budgetUSD,
+    budgetUnlimited,
+    pickContext,
+  );
 
   const mode = fits.length ? "in" : "stretch";
   return { gifts: sorted.slice(0, MAX_RESULTS), mode };
+}
+
+const LIST_MIN_OK_RATING = 3.6;
+
+function multiHobbyHayBonus(hay, pickContext) {
+  if (!pickContext?.groups?.length) return 0;
+  let mh = 0;
+  let matched = 0;
+  for (const gr of pickContext.groups) {
+    const terms = gr.terms || [];
+    if (!terms.some((t) => hay.includes(t))) continue;
+    matched++;
+    mh += 10;
+  }
+  if (matched >= 2) mh += 28;
+  if (matched >= 3) mh += 18;
+  return mh;
+}
+
+function scoreFinalizedGiftRow(g, budgetUSD, budgetUnlimited, pickContext) {
+  const p = g.selectedProduct;
+  const hay = `${g.categoryTitle || ""} ${p.name} ${p.blurb || ""}`.toLowerCase();
+  const mh = multiHobbyHayBonus(hay, pickContext);
+  const r = Number(p.rating) || 0;
+  let ratingPenalty = 0;
+  if (r < 3.5) ratingPenalty = 48;
+  else if (r < LIST_MIN_OK_RATING) ratingPenalty = 16;
+
+  if (budgetUnlimited) {
+    return mh + p.priceUSD * 0.00015 + r * 2.2 - ratingPenalty;
+  }
+
+  const cap = Math.max(budgetUSD, 1);
+  const ua = Math.min(1, p.priceUSD / cap);
+  const inB = p.priceUSD <= budgetUSD ? 1 : 0;
+  const base = r * (0.35 + 0.65 * ua) + (inB ? 9 : -14);
+  return base + mh - ratingPenalty;
 }
 
 /**
  * @param {object[]} pool finalized gifts with selectedProduct
  * @param {number} budgetUSD
  * @param {boolean} budgetUnlimited
+ * @param {{ groups?: { terms: string[] }[] } | null} [pickContext]
  */
-function sortGiftsByBudgetFit(pool, budgetUSD, budgetUnlimited) {
-  if (budgetUnlimited) {
-    return [...pool].sort((a, b) => {
-      const pa = a.selectedProduct.priceUSD;
-      const pb = b.selectedProduct.priceUSD;
-      const ra = a.selectedProduct.rating;
-      const rb = b.selectedProduct.rating;
-      if (pb !== pa) return pb - pa;
-      return rb - ra;
-    });
-  }
-
-  const cap = Math.max(budgetUSD, 1);
+function sortGiftsByBudgetFit(
+  pool,
+  budgetUSD,
+  budgetUnlimited,
+  pickContext = null,
+) {
   return [...pool].sort((a, b) => {
+    const sa = scoreFinalizedGiftRow(a, budgetUSD, budgetUnlimited, pickContext);
+    const sb = scoreFinalizedGiftRow(b, budgetUSD, budgetUnlimited, pickContext);
+    if (sb !== sa) return sb - sa;
+    const ra = Number(a.selectedProduct.rating) || 0;
+    const rb = Number(b.selectedProduct.rating) || 0;
+    if (rb !== ra) return rb - ra;
     const pa = a.selectedProduct.priceUSD;
     const pb = b.selectedProduct.priceUSD;
-    const ra = a.selectedProduct.rating;
-    const rb = b.selectedProduct.rating;
-    const ua = Math.min(1, pa / cap);
-    const ub = Math.min(1, pb / cap);
-    const scoreA = ra * (0.35 + 0.65 * ua);
-    const scoreB = rb * (0.35 + 0.65 * ub);
-    if (scoreB !== scoreA) return scoreB - scoreA;
-    return rb - ra;
+    if (budgetUnlimited) return pb - pa;
+    const ia = pa <= budgetUSD ? 1 : 0;
+    const ib = pb <= budgetUSD ? 1 : 0;
+    if (ib !== ia) return ib - ia;
+    if (ia) return pb - pa;
+    return pa - pb;
   });
+}
+
+/**
+ * Deterministic ordering for finalized rows (e.g. pure-Groq lists before enrichment).
+ */
+export function sortFinalizedGiftsForDisplay(
+  gifts,
+  budgetUSD,
+  budgetUnlimited,
+  pickContext,
+) {
+  return sortGiftsByBudgetFit(gifts, budgetUSD, budgetUnlimited, pickContext);
 }

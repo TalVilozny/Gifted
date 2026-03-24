@@ -945,6 +945,16 @@ h4 {
   display: block;
 }
 
+.GiftCard__budgetNote {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  background: var(--danger-soft);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+}
+
 .GiftCard__body {
   padding: 1.35rem 1.25rem 1.25rem;
   display: flex;

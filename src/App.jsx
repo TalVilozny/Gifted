@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import GiftedLight from "./Icons/GiftedLight.png";
 import GiftedLogo from "./Icons/GiftedLogo.png";
 import {
+  buildPickContext,
   CURRENCIES,
   DEFAULT_GIFT_IMAGE_URL,
   getRecommendations,
@@ -16,6 +17,7 @@ import {
 } from "./data/productEngine.js";
 import { getRetailerLinks, SHOP_COUNTRIES } from "./data/retailers.js";
 import {
+  enrichResultWithRetailPriceEstimates,
   generateGiftIdeasWithGroq,
   pickBestRetailerWithGroq,
   rankGiftsWithGroq,
@@ -34,6 +36,10 @@ function formatMoney(amount, code) {
   } catch {
     return `${amount.toFixed(2)} ${code}`;
   }
+}
+
+function formatApproxGiftPrice(amount, code) {
+  return `~${formatMoney(amount, code)}`;
 }
 
 /**
@@ -81,6 +87,36 @@ function Stars({ value, max = 5 }) {
 
 function toggleInList(list, id) {
   return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+}
+
+const CUSTOM_HOBBY_FILTER_PREFIX = "__cf:";
+
+function customHobbyFilterId(label) {
+  return `${CUSTOM_HOBBY_FILTER_PREFIX}${encodeURIComponent(label)}`;
+}
+
+function parseCustomHobbyFilterId(id) {
+  if (typeof id !== "string" || !id.startsWith(CUSTOM_HOBBY_FILTER_PREFIX))
+    return null;
+  try {
+    return decodeURIComponent(id.slice(CUSTOM_HOBBY_FILTER_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+/** Lowercased text blob for matching result rows to a free-text hobby filter. */
+function giftSearchTextForHobbyFilter(gift) {
+  const parts = [];
+  if (typeof gift.categoryTitle === "string") parts.push(gift.categoryTitle);
+  if (gift.variants?.length) {
+    for (const v of gift.variants) {
+      if (v.name) parts.push(v.name);
+      if (v.blurb) parts.push(v.blurb);
+      if (v.tags?.length) parts.push(v.tags.join(" "));
+    }
+  }
+  return parts.join(" ").toLowerCase();
 }
 
 const RECIPIENT_RELATIONS = [
@@ -386,6 +422,11 @@ const CASE_ITEM_PX = 152;
 const CASE_CYCLES = 52;
 /** Slightly longer than CSS transition (4.6s) so `transitionend` can win. */
 const CASE_TRANSITION_FALLBACK_MS = 5600;
+/**
+ * When the chosen variant is above this multiple of the soft recommendation budget,
+ * show an in-card note. Small overages stay unlabeled; large jumps (e.g. ~2×) are flagged.
+ */
+const BUDGET_OVER_NOTICE_RATIO = 1.28;
 const APP_PATH = "/Gifted";
 const PRIVACY_PATH = "/Gifted/privacy-policy";
 const DIY_TUTORIAL_BUDGET_MAX_USD = 60;
@@ -684,6 +725,11 @@ export default function App() {
 
   const hasPassions = selectedHobbyIds.length > 0 || customHobbies.length > 0;
 
+  const giftPickContext = useMemo(
+    () => buildPickContext(selectedHobbyIds, customHobbies),
+    [selectedHobbyIds, customHobbies],
+  );
+
   useEffect(() => {
     if (budgetUnlimited) return;
     setBudgetSlider((prev) => {
@@ -904,7 +950,16 @@ export default function App() {
     await new Promise((r) => setTimeout(r, 500));
 
     const rec = await fetchRecommendationsCore();
-    setResult(stampGiftIdsForResult(rec));
+    const stamped = stampGiftIdsForResult(rec);
+    const priced = groqReady
+      ? await enrichResultWithRetailPriceEstimates(
+          stamped,
+          recommendationBudgetUsd,
+          budgetUnlimited,
+          giftPickContext,
+        )
+      : stamped;
+    setResult(priced);
     if (giftPref === "diy") {
       setDiyTutorialIds((prev) =>
         pickRandomTutorialIds(DIY_TUTORIALS, 3, prev),
@@ -923,7 +978,16 @@ export default function App() {
     setDislikedIds([]);
     try {
       const rec = await fetchRecommendationsCore();
-      setResult(stampGiftIdsForResult(rec));
+      const stamped = stampGiftIdsForResult(rec);
+      const priced = groqReady
+        ? await enrichResultWithRetailPriceEstimates(
+            stamped,
+            recommendationBudgetUsd,
+            budgetUnlimited,
+            giftPickContext,
+          )
+        : stamped;
+      setResult(priced);
       if (giftPref === "diy") {
         setDiyTutorialIds((prev) =>
           pickRandomTutorialIds(DIY_TUTORIALS, 3, prev),
@@ -1103,20 +1167,42 @@ export default function App() {
 
   const chosenHobbyFilterOptions = useMemo(() => {
     const fromCustom = inferHobbyIdsFromCustomLabels(customHobbies);
-    const ids = [...selectedHobbyIds, ...fromCustom];
-    const unique = [...new Set(ids)];
-    return unique.map((id) => hobbies.find((h) => h.id === id)).filter(Boolean);
+    const catalogIds = [...new Set([...selectedHobbyIds, ...fromCustom])];
+    const seenCatalog = new Set(catalogIds);
+    const options = catalogIds
+      .map((id) => hobbies.find((h) => h.id === id))
+      .filter(Boolean)
+      .map((h) => ({ id: h.id, title: h.title, emoji: h.emoji }));
+
+    for (const label of customHobbies) {
+      const inferred = inferHobbyIdsFromCustomLabels([label]);
+      const reinforcesShownCatalog =
+        inferred.length > 0 && inferred.some((hid) => seenCatalog.has(hid));
+      if (reinforcesShownCatalog) continue;
+      options.push({
+        id: customHobbyFilterId(label),
+        title: label,
+        emoji: "✎",
+      });
+    }
+    return options;
   }, [selectedHobbyIds, customHobbies]);
 
   const visibleShortlistGifts = useMemo(() => {
     if (!result?.gifts?.length) return [];
+    const customFilterLabel = parseCustomHobbyFilterId(activeHobbyFilterId);
+    const customNeedle =
+      customFilterLabel != null ? customFilterLabel.toLowerCase() : null;
     return result.gifts
       .filter((g) => !dislikedIds.includes(g.id))
-      .filter(
-        (g) =>
-          activeHobbyFilterId == null ||
-          g._sourceHobbyId === activeHobbyFilterId,
-      );
+      .filter((g) => {
+        if (activeHobbyFilterId == null) return true;
+        if (g._sourceHobbyId === activeHobbyFilterId) return true;
+        if (customNeedle != null) {
+          return giftSearchTextForHobbyFilter(g).includes(customNeedle);
+        }
+        return false;
+      });
   }, [result, dislikedIds, activeHobbyFilterId]);
 
   const showDiyTutorials = useMemo(
@@ -1148,7 +1234,12 @@ export default function App() {
 
   function handleAlternate(gift) {
     const p = displayProduct(gift);
-    const next = pickNextAlternate(gift.variants, p.id, effectiveBudgetUsd);
+    const next = pickNextAlternate(
+      gift.variants,
+      p.id,
+      effectiveBudgetUsd,
+      giftPickContext,
+    );
     setVariantByGiftId((prev) => ({ ...prev, [gift.id]: next.id }));
   }
 
@@ -1172,6 +1263,7 @@ export default function App() {
         gift.variants,
         text,
         effectiveBudgetUsd,
+        giftPickContext,
       );
       setVariantByGiftId((prev) => ({ ...prev, [gift.id]: picked.id }));
     };
@@ -2125,7 +2217,7 @@ export default function App() {
                 <h2 className="Thinking__title">Finding the best fit…</h2>
                 <p className="Thinking__text">
                   {groqReady
-                    ? "Creating personalized gift ideas from your hobbies"
+                    ? "Creating personalized gift ideas and estimating typical prices and ratings"
                     : "Scoring gifts from our catalog for your hobbies and budget"}{" "}
                   in{" "}
                   {CURRENCIES.find((c) => c.code === currency)?.label ??
@@ -2275,7 +2367,7 @@ export default function App() {
                                 {lp.name}
                               </span>
                               <span className="LikedSection__price">
-                                {formatMoney(lpLocal, currency)}
+                                {formatApproxGiftPrice(lpLocal, currency)}
                                 {isGroupRecipient && (
                                   <> total for {safeGroupSize} people</>
                                 )}
@@ -2345,6 +2437,12 @@ export default function App() {
                     const isLiked = likedEntries.some(
                       (e) => e.gift.id === gift.id,
                     );
+                    const showOverBudgetNotice =
+                      !budgetUnlimited &&
+                      Number.isFinite(recommendationBudgetUsd) &&
+                      recommendationBudgetUsd > 0 &&
+                      product.priceUSD >
+                        recommendationBudgetUsd * BUDGET_OVER_NOTICE_RATIO;
                     return (
                       <li
                         key={gift.id}
@@ -2362,6 +2460,11 @@ export default function App() {
                           />
                         </div>
                         <div className="GiftCard__body">
+                          {showOverBudgetNotice && (
+                            <p className="GiftCard__budgetNote" role="status">
+                              This item is relevant, but above your budget.
+                            </p>
+                          )}
                           {gift.categoryTitle && (
                             <p className="GiftCard__category">
                               {gift.categoryTitle}
@@ -2400,12 +2503,13 @@ export default function App() {
                               </div>
                               <div className="GiftCard__score">
                                 <span className="GiftCard__price">
-                                  {formatMoney(priceLocal, currency)}
+                                  {formatApproxGiftPrice(priceLocal, currency)}
                                 </span>
                                 {isGroupRecipient && (
                                   <span className="GiftCard__priceMeta">
                                     total for {safeGroupSize} people (
-                                    {formatMoney(eachLocal, currency)} each)
+                                    {formatApproxGiftPrice(eachLocal, currency)}{" "}
+                                    each)
                                   </span>
                                 )}
                                 <span className="GiftCard__rating">

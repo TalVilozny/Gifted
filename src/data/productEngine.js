@@ -149,29 +149,132 @@ export function pickBestVariantForBudget(variants, budgetUSD) {
   )[0];
 }
 
+const MIN_ACCEPTABLE_RATING = 3.6;
+
+/**
+ * Deterministic score: budget fit, aggregate rating, and overlap with hobby term groups
+ * (including bonuses when multiple hobby groups match — “multi-hobby” picks).
+ * @param {ProductVariant} v
+ * @param {number} budgetCap Infinity when unlimited
+ * @param {{ groups?: { terms: string[] }[] }} pickContext
+ */
+export function scoreVariantForGiftPick(v, budgetCap, pickContext) {
+  let s = 0;
+  const r = Number(v.rating);
+  const rating = Number.isFinite(r) ? r : 4;
+  if (rating < 3.4) s -= 140;
+  else if (rating < MIN_ACCEPTABLE_RATING) s -= 42;
+  s += rating * 24;
+
+  const unlimited = isUnlimitedBudget(budgetCap);
+  if (unlimited) {
+    s += Math.min(24, v.priceUSD / 170);
+  } else {
+    const cap = Math.max(budgetCap, 1);
+    if (v.priceUSD <= budgetCap) {
+      s += 72;
+      s += 44 * Math.min(1, v.priceUSD / cap);
+    } else {
+      const over = v.priceUSD - budgetCap;
+      s -= 58 + over * 0.11;
+    }
+  }
+
+  const groups = pickContext?.groups;
+  if (groups?.length) {
+    const hay = `${v.name} ${v.blurb} ${(v.tags || []).join(" ")}`.toLowerCase();
+    let matchedGroups = 0;
+    for (const g of groups) {
+      const terms = g.terms || [];
+      if (!terms.length) continue;
+      let any = false;
+      for (const t of terms) {
+        if (t && hay.includes(String(t).toLowerCase())) {
+          any = true;
+          s += 4;
+        }
+      }
+      if (any) matchedGroups++;
+    }
+    if (matchedGroups >= 2) s += 36;
+    if (matchedGroups >= 3) s += 22;
+  }
+
+  return s;
+}
+
+function compareVariantsForGiftPick(a, b, budgetCap, pickContext) {
+  const sb = scoreVariantForGiftPick(b, budgetCap, pickContext);
+  const sa = scoreVariantForGiftPick(a, budgetCap, pickContext);
+  if (sb !== sa) return sb - sa;
+  const rb = Number(b.rating) || 0;
+  const ra = Number(a.rating) || 0;
+  if (rb !== ra) return rb - ra;
+  if (isUnlimitedBudget(budgetCap)) {
+    if (b.priceUSD !== a.priceUSD) return b.priceUSD - a.priceUSD;
+    return a.name.localeCompare(b.name);
+  }
+  const inB = b.priceUSD <= budgetCap ? 1 : 0;
+  const inA = a.priceUSD <= budgetCap ? 1 : 0;
+  if (inB !== inA) return inB - inA;
+  if (inA) {
+    if (b.priceUSD !== a.priceUSD) return b.priceUSD - a.priceUSD;
+    return a.name.localeCompare(b.name);
+  }
+  if (a.priceUSD !== b.priceUSD) return a.priceUSD - b.priceUSD;
+  return a.name.localeCompare(b.name);
+}
+
+/**
+ * @param {ProductVariant[]} variants
+ * @param {number} budgetCap
+ * @param {{ groups?: { terms: string[] }[] } | null} pickContext
+ */
+export function sortVariantsForGiftPick(variants, budgetCap, pickContext) {
+  if (!pickContext?.groups?.length) {
+    const pool = [...variants];
+    if (isUnlimitedBudget(budgetCap)) {
+      return pool.sort(
+        (a, b) =>
+          b.priceUSD - a.priceUSD ||
+          b.rating - a.rating ||
+          a.name.localeCompare(b.name),
+      );
+    }
+    return pool.sort((a, b) => {
+      const ab = a.priceUSD <= budgetCap ? 1 : 0;
+      const bb = b.priceUSD <= budgetCap ? 1 : 0;
+      if (bb !== ab) return bb - ab;
+      return (
+        b.rating - a.rating ||
+        b.priceUSD - a.priceUSD ||
+        a.name.localeCompare(b.name)
+      );
+    });
+  }
+  return [...variants].sort((a, b) =>
+    compareVariantsForGiftPick(a, b, budgetCap, pickContext),
+  );
+}
+
+/**
+ * @param {ProductVariant[]} variants
+ * @param {number} budgetCap
+ * @param {{ groups?: { terms: string[] }[] }} pickContext
+ */
+export function pickBestVariantForBudgetScored(variants, budgetCap, pickContext) {
+  const sorted = sortVariantsForGiftPick(variants, budgetCap, pickContext);
+  return sorted[0] ?? variants[0];
+}
+
 /**
  * @param {ProductVariant[]} variants
  * @param {string} currentId
  * @param {number} budgetUSD
+ * @param {{ groups?: { terms: string[] }[] } | null} [pickContext]
  */
-export function pickNextAlternate(variants, currentId, budgetUSD) {
-  const order = [...variants].sort((a, b) => {
-    if (isUnlimitedBudget(budgetUSD)) {
-      return (
-        b.priceUSD - a.priceUSD ||
-        b.rating - a.rating ||
-        a.name.localeCompare(b.name)
-      );
-    }
-    const ab = a.priceUSD <= budgetUSD ? 1 : 0;
-    const bb = b.priceUSD <= budgetUSD ? 1 : 0;
-    if (bb !== ab) return bb - ab;
-    return (
-      b.rating - a.rating ||
-      b.priceUSD - a.priceUSD ||
-      a.name.localeCompare(b.name)
-    );
-  });
+export function pickNextAlternate(variants, currentId, budgetUSD, pickContext = null) {
+  const order = sortVariantsForGiftPick(variants, budgetUSD, pickContext);
   const idx = order.findIndex((v) => v.id === currentId);
   if (idx < 0) return order[0];
   return order[(idx + 1) % order.length];
@@ -183,10 +286,17 @@ export function pickNextAlternate(variants, currentId, budgetUSD) {
  * @param {string} query
  * @param {number} budgetUSD
  */
-export function pickVariantFromRefinement(variants, query, budgetUSD) {
+export function pickVariantFromRefinement(
+  variants,
+  query,
+  budgetUSD,
+  pickContext = null,
+) {
   const raw = tokenizeQuery(query);
   if (raw.length === 0) {
-    return pickBestVariantForBudget(variants, budgetUSD);
+    return pickContext?.groups?.length
+      ? pickBestVariantForBudgetScored(variants, budgetUSD, pickContext)
+      : pickBestVariantForBudget(variants, budgetUSD);
   }
   const wanted = new Set(raw);
   for (const tok of raw) {
@@ -226,7 +336,9 @@ export function pickVariantFromRefinement(variants, query, budgetUSD) {
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
   if (!best || best.score < 1) {
-    return pickBestVariantForBudget(variants, budgetUSD);
+    return pickContext?.groups?.length
+      ? pickBestVariantForBudgetScored(variants, budgetUSD, pickContext)
+      : pickBestVariantForBudget(variants, budgetUSD);
   }
   return best.v;
 }

@@ -1,6 +1,8 @@
 import {
+  buildPickContext,
   finalizeGiftRow,
   inferHobbyIdsFromCustomLabels,
+  sortFinalizedGiftsForDisplay,
 } from "../data/giftCatalog.js";
 import {
   completeGroq,
@@ -76,7 +78,8 @@ function slugId(s) {
   return t || "idea";
 }
 
-function clampPriceUSD(n, budgetUSD, budgetUnlimited) {
+/** Keep model-estimated prices in a sane range vs. the user’s soft budget. */
+export function clampRetailPriceUSD(n, budgetUSD, budgetUnlimited) {
   const x = Number(n);
   const cap =
     typeof budgetUSD === "number" && Number.isFinite(budgetUSD) ? budgetUSD : 75;
@@ -256,7 +259,12 @@ User context:
 - Gifts for: ${genderLabel}
 ${recipientMeta}- Interests (hobbies): ${JSON.stringify([...hobbyTitles, ...customLabels])}
 ${budgetLine}${prefLine}
-Reorder the gift options from MOST exciting and memorable to still-good, best overall fit for ${reorderTarget}.
+Reorder the gift options from **best overall fit** to weaker fit for ${reorderTarget}. Use a **stable, rule-based** ordering (no random tie-breaking).
+
+Priorities (in order):
+1) **Hobby fit** — stronger match to the listed interests; **prefer** items that clearly touch **two or more** interests when that is genuine (not forced).
+2) **Budget** — respect the soft budget: favor in-budget picks when quality of match is similar; do not put wildly over-budget items above strong in-budget matches.
+3) **Ratings** — when (1) and (2) are close, favor higher customer ratings.
 
 Guidance:
 - Prefer **variety**: do not rank five similar small accessories at the top when the list includes bigger or more distinctive gifts for the same hobby.
@@ -270,7 +278,7 @@ Rules:
 options:
 ${JSON.stringify(options, null, 2)}`;
 
-  const text = await completeGroq(prompt, { temperature: 0.45 });
+  const text = await completeGroq(prompt, { temperature: 0.12 });
   const parsed = extractJsonObject(text);
   const ids = parsed.orderedIds;
   if (!Array.isArray(ids) || ids.length === 0) return null;
@@ -386,6 +394,7 @@ Rules:
 - Each gift: "stableId" (short slug), "category" (section title), "diy" (boolean), "variants" array with 1–3 items (different price tiers or configurations)—use 2–3 when possible.
 - Each variant: "name", "blurb" (one sentence), "priceUSD" (number), "tags" (2–6 strings).
 - Ideas must feel unique and well-matched—avoid repeating the same product type across rows.
+- When several interests are listed, include **several** ideas that intentionally **blend two or more** of them (e.g. gaming + music, coffee + reading), not only single-hobby items.
 
 Return ONLY valid JSON:
 {
@@ -408,6 +417,7 @@ Return ONLY valid JSON:
   if (!Array.isArray(rawList) || rawList.length === 0) return null;
 
   const intro = typeof parsed.intro === "string" ? parsed.intro : "";
+  const pickContext = buildPickContext(selectedHobbyIds, customLabels);
 
   const out = [];
   for (let i = 0; i < Math.min(rawList.length, MAX_AI_GIFTS); i++) {
@@ -421,7 +431,7 @@ Return ONLY valid JSON:
     const variants = vars.slice(0, 3).map((v, j) => ({
       id: `${rowId}-v${j}`,
       name: typeof v.name === "string" ? v.name : `Option ${j + 1}`,
-      priceUSD: clampPriceUSD(v.priceUSD, budgetUSD, budgetUnlimited),
+      priceUSD: clampRetailPriceUSD(v.priceUSD, budgetUSD, budgetUnlimited),
       rating: 4.65,
       tags: Array.isArray(v.tags) ? v.tags.map(String).slice(0, 8) : [],
       blurb:
@@ -443,11 +453,172 @@ Return ONLY valid JSON:
       _aiGenerated: true,
     };
 
-    out.push(finalizeGiftRow(row, budgetUSD, hobbyKey, budgetUnlimited));
+    out.push(
+      finalizeGiftRow(row, budgetUSD, hobbyKey, budgetUnlimited, pickContext),
+    );
   }
 
   if (out.length === 0) return null;
-  return { gifts: out, intro };
+  return {
+    gifts: sortFinalizedGiftsForDisplay(
+      out,
+      budgetUSD,
+      budgetUnlimited,
+      pickContext,
+    ),
+    intro,
+  };
+}
+
+const RETAIL_ESTIMATE_CHUNK = 32;
+
+function clampAggregateStarRating(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return null;
+  const r = Math.round(x * 10) / 10;
+  return Math.min(5, Math.max(1, r));
+}
+
+/**
+ * Typical US retail price + plausible aggregate star rating per variant (one Groq round-trip per chunk).
+ * @param {{ id: string, name: string, blurb?: string, categoryTitle?: string }[]} items
+ * @param {{ softBudgetUSD?: number | null, budgetUnlimited?: boolean }} [ctx]
+ * @returns {Promise<{ prices: Record<string, number>, ratings: Record<string, number> }>}
+ */
+async function estimateRetailPricesAndRatingsWithGroq(items, ctx = {}) {
+  if (!isGroqConfigured() || !items.length) return { prices: {}, ratings: {} };
+
+  const { softBudgetUSD = null, budgetUnlimited = false } = ctx;
+  const budgetNote = budgetUnlimited
+    ? "Context: shopper has a very high / open budget — still quote realistic market averages."
+    : typeof softBudgetUSD === "number" && Number.isFinite(softBudgetUSD)
+      ? `Context: soft gift budget ~$${Math.round(softBudgetUSD)} USD — still estimate true typical retail averages (do not fake all prices to match the budget).`
+      : "";
+
+  const prices = {};
+  const ratings = {};
+
+  for (let offset = 0; offset < items.length; offset += RETAIL_ESTIMATE_CHUNK) {
+    const chunk = items.slice(offset, offset + RETAIL_ESTIMATE_CHUNK);
+    const prompt = `For each item, estimate:
+1) **avgUSD** — typical US retail price for a comparable new product (mid-range SKU on major marketplaces; not the cheapest used deal).
+2) **avgStars** — plausible **aggregate** customer star rating (1.0–5.0, one decimal) as if averaged from thousands of reviews on major retailers. Use real-world spread: excellent mainstream items often ~4.3–4.8; niche, finicky, or budget categories can be ~3.5–4.2; rarely above 4.9 or below 3.0 unless the product type clearly warrants it. Do **not** give every item the same score.
+
+${budgetNote}
+
+Return ONLY valid JSON:
+{"estimates":[{"id":"<exact id from input>","avgUSD":<number>,"avgStars":<number>}]}
+
+Rules:
+- Include every input item once; "id" must match exactly (character-for-character).
+- avgUSD: positive number, USD, no symbol.
+- avgStars: number from 1.0 to 5.0 (one decimal is fine).
+- For experiences (classes, tickets, spa), estimate usual purchase price and typical satisfaction-style aggregate if applicable (~4.0–4.8).
+
+Items:
+${JSON.stringify(chunk)}`;
+
+    const text = await completeGroq(prompt, {
+      temperature: 0.18,
+      max_tokens: 8192,
+    });
+    const parsed = extractJsonObject(text);
+    const rows = Array.isArray(parsed.estimates)
+      ? parsed.estimates
+      : Array.isArray(parsed.prices)
+        ? parsed.prices
+        : [];
+    for (const row of rows) {
+      if (typeof row?.id !== "string") continue;
+      if (
+        typeof row.avgUSD === "number" &&
+        Number.isFinite(row.avgUSD) &&
+        row.avgUSD > 0
+      ) {
+        prices[row.id] = row.avgUSD;
+      }
+      const stars = clampAggregateStarRating(row.avgStars);
+      if (stars != null) ratings[row.id] = stars;
+    }
+  }
+
+  return { prices, ratings };
+}
+
+/**
+ * Replace variant priceUSD with Groq-estimated averages and re-pick default variants for budget.
+ * @param {{ gifts: object[] } | null} rec
+ * @param {number} recommendationBudgetUsd
+ * @param {boolean} budgetUnlimited
+ * @param {{ groups?: { terms: string[] }[] } | null} [pickContext]
+ */
+export async function enrichResultWithRetailPriceEstimates(
+  rec,
+  recommendationBudgetUsd,
+  budgetUnlimited,
+  pickContext = null,
+) {
+  if (!isGroqConfigured() || !rec?.gifts?.length) return rec;
+
+  const items = [];
+  for (const g of rec.gifts) {
+    for (const v of g.variants || []) {
+      items.push({
+        id: v.id,
+        name: v.name,
+        blurb: typeof v.blurb === "string" ? v.blurb : "",
+        categoryTitle:
+          typeof g.categoryTitle === "string" ? g.categoryTitle : "",
+      });
+    }
+  }
+  if (!items.length) return rec;
+
+  try {
+    const { prices: priceMap, ratings: ratingMap } =
+      await estimateRetailPricesAndRatingsWithGroq(items, {
+        softBudgetUSD: budgetUnlimited ? null : recommendationBudgetUsd,
+        budgetUnlimited,
+      });
+    const cap = budgetUnlimited ? Infinity : recommendationBudgetUsd;
+    const nextGifts = rec.gifts.map((gift) => {
+      const nextVariants = (gift.variants || []).map((v) => {
+        let next = v;
+        const rawPrice = priceMap[v.id];
+        if (typeof rawPrice === "number" && Number.isFinite(rawPrice)) {
+          const priceUSD = clampRetailPriceUSD(
+            rawPrice,
+            recommendationBudgetUsd,
+            budgetUnlimited,
+          );
+          next = { ...next, priceUSD };
+        }
+        const r = ratingMap[v.id];
+        if (typeof r === "number" && Number.isFinite(r)) {
+          next = { ...next, rating: r };
+        }
+        return next;
+      });
+      return finalizeGiftRow(
+        { ...gift, variants: nextVariants },
+        cap,
+        gift._sourceHobbyId,
+        budgetUnlimited,
+        pickContext,
+      );
+    });
+    const sorted = pickContext?.groups?.length
+      ? sortFinalizedGiftsForDisplay(
+          nextGifts,
+          recommendationBudgetUsd,
+          budgetUnlimited,
+          pickContext,
+        )
+      : nextGifts;
+    return { ...rec, gifts: sorted };
+  } catch {
+    return rec;
+  }
 }
 
 /**
