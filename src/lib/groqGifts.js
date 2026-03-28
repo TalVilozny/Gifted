@@ -646,7 +646,12 @@ Return ONLY valid JSON:
   };
 }
 
-const RETAIL_ESTIMATE_CHUNK = 32;
+/** Larger chunks = fewer round trips (helps Groq rate limits). */
+const RETAIL_ESTIMATE_CHUNK = 48;
+
+function sleepMs(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 function clampAggregateStarRating(n) {
   const x = Number(n);
@@ -675,6 +680,9 @@ async function estimateRetailPricesAndRatingsWithGroq(items, ctx = {}) {
   const ratings = {};
 
   for (let offset = 0; offset < items.length; offset += RETAIL_ESTIMATE_CHUNK) {
+    if (offset > 0) {
+      await sleepMs(800);
+    }
     const chunk = items.slice(offset, offset + RETAIL_ESTIMATE_CHUNK);
     const prompt = `For each item, estimate:
 1) **avgUSD** — typical US retail price for a comparable new product (mid-range SKU on major marketplaces; not the cheapest used deal).

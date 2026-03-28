@@ -84,47 +84,59 @@ async function completeGroqDirect(prompt, options = {}) {
 }
 
 /**
+ * One in-flight `/api/groq` at a time so bursts of Groq work (ideas + price chunks)
+ * do not overlap and trip Groq rate limits (HTTP 429).
+ */
+let groqProxyChain = Promise.resolve();
+
+/**
  * Server proxy (`/api/groq` on Vercel or Vite dev middleware) — uses `GROQ_API_KEY`.
  */
 async function completeGroqProxy(prompt, options = {}) {
-  const model = options.model ?? getGroqModelName();
-  const payload = {
-    prompt,
-    options: {
-      model,
-      temperature: options.temperature ?? 0.35,
-      max_tokens: options.max_tokens ?? 8192,
-      baseUrl: import.meta.env.VITE_GROQ_API_BASE?.trim() || undefined,
-    },
+  const run = async () => {
+    const model = options.model ?? getGroqModelName();
+    const payload = {
+      prompt,
+      options: {
+        model,
+        temperature: options.temperature ?? 0.35,
+        max_tokens: options.max_tokens ?? 8192,
+        baseUrl: import.meta.env.VITE_GROQ_API_BASE?.trim() || undefined,
+      },
+    };
+
+    const res = await fetch(groqProxyUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-GiftPicker-AI": "groq-proxy",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const ct = res.headers.get("content-type") || "";
+    const data = ct.includes("application/json")
+      ? await res.json().catch(() => ({}))
+      : await res.text().then((t) => ({ _raw: t }));
+
+    if (!res.ok) {
+      const msg =
+        typeof data.error === "string"
+          ? data.error
+          : typeof data._raw === "string" && data._raw.includes("<!DOCTYPE")
+            ? `Groq proxy returned HTML (${res.status}) — check /api/groq on your host`
+            : `Groq proxy error (${res.status})`;
+      throw new Error(msg);
+    }
+    if (typeof data.content !== "string") {
+      throw new Error("Invalid response from Groq proxy");
+    }
+    return data.content;
   };
 
-  const res = await fetch(groqProxyUrl(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-GiftPicker-AI": "groq-proxy",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const ct = res.headers.get("content-type") || "";
-  const data = ct.includes("application/json")
-    ? await res.json().catch(() => ({}))
-    : await res.text().then((t) => ({ _raw: t }));
-
-  if (!res.ok) {
-    const msg =
-      typeof data.error === "string"
-        ? data.error
-        : typeof data._raw === "string" && data._raw.includes("<!DOCTYPE")
-          ? `Groq proxy returned HTML (${res.status}) — check /api/groq on your host`
-          : `Groq proxy error (${res.status})`;
-    throw new Error(msg);
-  }
-  if (typeof data.content !== "string") {
-    throw new Error("Invalid response from Groq proxy");
-  }
-  return data.content;
+  const next = groqProxyChain.then(run, run);
+  groqProxyChain = next.catch(() => {}).then(() => {});
+  return next;
 }
 
 /**
