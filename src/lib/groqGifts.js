@@ -88,8 +88,9 @@ function interestsSoundFoodSpaOrTravel(customLabels) {
 }
 
 /**
- * Drop AI rows that are generic dining/spa “experience gift card” fillers when the
- * user asked for physical gifts (or DIY) and their interests are hobby/tech-focused.
+ * Drop only **obvious** generic dining/spa/multi-venue “experience gift card” rows.
+ * Kept intentionally narrow: broad matching removed valid products whose blurbs
+ * mentioned “travel” etc. alongside unrelated “gift” wording, which emptied lists.
  */
 function shouldDropLazyExperienceGiftCardRow(item, giftPreference, customLabels) {
   if (giftPreference === "experience") return false;
@@ -104,7 +105,7 @@ function shouldDropLazyExperienceGiftCardRow(item, giftPreference, customLabels)
     .toLowerCase();
   if (!/\b(gift\s*card|e-?gift|gift\s*voucher)\b/.test(text)) return false;
   if (
-    /\b(steam|playstation|ps5|xbox|nintendo|switch|epic\s*games|battlenet|fanatec|iracing|assetto|sim\s*racing)\b/.test(
+    /\b(steam|playstation|ps5|xbox|nintendo|switch|epic|battlenet|fanatec|iracing|assetto|sim\s*racing|amazon|best\s*buy|target)\b/.test(
       text,
     )
   ) {
@@ -112,9 +113,10 @@ function shouldDropLazyExperienceGiftCardRow(item, giftPreference, customLabels)
   }
   if (interestsSoundFoodSpaOrTravel(customLabels)) return false;
   if (
-    /\b(experience\s+gift\s+card|dining|spa|restaurant|hotel|travel|getaway|local\s+dining|wine\s+tasting|visa|mastercard|amex)\b/.test(
-      text,
-    )
+    /\bexperience\s+gift\s+card\b/.test(text) ||
+    /\b(local\s+dining|dining\s*\/\s*spa|spa\s*\/\s*dining)\b/.test(text) ||
+    /\bgift\s+card\s*\([^)]*(dining|spa|restaurant|hotel)/.test(text) ||
+    /\b(visa|mastercard|amex|american\s+express)\s+gift\s+card\b/.test(text)
   ) {
     return true;
   }
@@ -568,10 +570,10 @@ Return ONLY valid JSON:
   const rawList = parsed.gifts;
   if (!Array.isArray(rawList) || rawList.length === 0) return null;
 
-  const listToUse = rawList.filter(
+  const filtered = rawList.filter(
     (row) => !shouldDropLazyExperienceGiftCardRow(row, pref, customLabels),
   );
-  if (listToUse.length === 0) return null;
+  const listToUse = filtered.length > 0 ? filtered : rawList;
 
   const intro = typeof parsed.intro === "string" ? parsed.intro : "";
   const pickContext = buildPickContext(selectedHobbyIds, customLabels);
