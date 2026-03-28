@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import GiftedLight from "./Icons/GiftedLight.svg";
 import GiftedLogo from "./Icons/GiftedLogo.png";
 import langEnFlag from "./Icons/USAFlag.png";
+import { Analytics } from "@vercel/analytics/react";
 import langHeFlag from "./Icons/IsraelFlag.png";
 import { hobbyTitleSubtitle, makeT } from "./i18n/index.js";
 import {
@@ -102,7 +103,12 @@ function dropGiftsBelowMinBudget(rec, minUsd, budgetUnlimited) {
 }
 
 /** Dedup by id; fill from filler until at least minCount (used for AI + catalog merge). */
-function mergeGiftListsInto(primary, filler, minCount, sourceFallback = "catalog") {
+function mergeGiftListsInto(
+  primary,
+  filler,
+  minCount,
+  sourceFallback = "catalog",
+) {
   const base = primary?.gifts?.length ? [...primary.gifts] : [];
   const seen = new Set(base.map((g) => g.id));
   const out = [...base];
@@ -2606,7 +2612,7 @@ export default function App() {
                     ))}
                   </div>
                 )}
-
+                <Analytics />
                 <div className="HobbyGrid">
                   {localizedHobbies.map((h) => {
                     const on = selectedHobbyIds.includes(h.id);
