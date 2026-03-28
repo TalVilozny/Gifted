@@ -480,10 +480,10 @@ const REFINE_PLACEHOLDER_BY_HOBBY = {
     "all-weather floor mats",
   ],
   makeup: [
-    "warm undertone shades",
-    "matte not dewy finish",
-    "travel minis",
-    "vegan or cruelty-free",
+    "metal preference (gold vs silver)",
+    "ring size if known",
+    "minimal vs statement",
+    "hypoallergenic / nickel-free",
   ],
   pcbuilding: [
     "750W gold PSU",
@@ -685,7 +685,12 @@ function isSubscriptionLikeGift(gift, product) {
   );
 }
 
-function buildImageSearchQuery(product, gift, interestHints = []) {
+/**
+ * Pexels should illustrate the **product**, not the recipient’s hobbies.
+ * `interestTermsToExclude` — preset + custom hobby labels — removes tags that were
+ * only added so filters match, which would otherwise skew photo search toward hobbies.
+ */
+function buildImageSearchQuery(product, gift, interestTermsToExclude = []) {
   const stop = new Set([
     "gift",
     "perfect",
@@ -710,13 +715,32 @@ function buildImageSearchQuery(product, gift, interestHints = []) {
       .replace(/[^a-z0-9\s]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
+
+  const exclude = new Set();
+  for (const raw of interestTermsToExclude || []) {
+    const c = clean(raw);
+    if (!c) continue;
+    exclude.add(c);
+    for (const w of c.split(/\s+/)) {
+      if (w.length > 2) exclude.add(w);
+    }
+  }
+
+  function tagIsInterestEcho(tagCleaned) {
+    if (!tagCleaned) return true;
+    if (exclude.has(tagCleaned)) return true;
+    const words = tagCleaned.split(/\s+/).filter((w) => w.length > 0);
+    if (words.length === 0) return true;
+    return words.every((w) => w.length > 2 && exclude.has(w));
+  }
+
   const nameWords = clean(product?.name)
     .split(" ")
     .filter((w) => w.length > 2 && !stop.has(w))
     .slice(0, 7);
   const tagBits = (Array.isArray(product?.tags) ? product.tags : [])
     .map((t) => clean(t))
-    .filter(Boolean)
+    .filter((t) => t && !tagIsInterestEcho(t))
     .slice(0, 4);
   const blurbWords = clean(product?.blurb)
     .split(" ")
@@ -726,16 +750,11 @@ function buildImageSearchQuery(product, gift, interestHints = []) {
     .split(" ")
     .filter((w) => w.length > 2 && !stop.has(w))
     .slice(0, 4);
-  const hintWords = (Array.isArray(interestHints) ? interestHints : [])
-    .flatMap((h) => clean(h).split(" "))
-    .filter((w) => w.length > 2 && !stop.has(w))
-    .slice(0, 4);
   const ordered = [
     ...nameWords,
     ...tagBits.flatMap((t) => t.split(" ").filter((w) => w.length > 2)),
     ...blurbWords,
     ...catWords,
-    ...hintWords,
   ].filter(Boolean);
   const deduped = [];
   const seen = new Set();
@@ -743,6 +762,10 @@ function buildImageSearchQuery(product, gift, interestHints = []) {
     if (seen.has(w)) continue;
     seen.add(w);
     deduped.push(w);
+  }
+  if (deduped.length === 0) {
+    const fb = (clean(gift?.categoryTitle) || "gift").split(" ").slice(0, 4).join(" ");
+    return `${fb} product`.trim().slice(0, 100);
   }
   const core = deduped.join(" ").slice(0, 100);
   const normalized = core

@@ -129,11 +129,11 @@ export const hobbies = [
   },
   {
     id: "makeup",
-    title: "Makeup & Beauty",
-    subtitle: "Palettes, skincare, and signature looks",
+    title: "Jewelry",
+    subtitle: "Necklaces, rings, and pieces they’ll wear on repeat",
     cardGradient:
       "linear-gradient(145deg, rgba(236, 72, 153, 0.22), rgba(244, 114, 182, 0.12))",
-    emoji: "💄",
+    emoji: "💎",
     forGender: "female",
   },
   {
@@ -988,79 +988,79 @@ export const giftsByHobby = {
   makeup: [
     {
       id: "mb1",
-      categoryTitle: "Eye palettes",
+      categoryTitle: "Everyday jewelry",
       forGender: "female",
       variants: [
         {
           id: "mb1-warm",
-          name: "Warm Neutral Eyeshadow Palette (18 shades)",
+          name: "Layered gold-plated necklace set (3 strands)",
           priceUSD: 42,
           rating: 4.8,
           image:
-            "https://images.unsplash.com/photo-1512207736890-6ffed8a84e8d?auto=format&fit=crop&w=1200&h=750&q=88",
-          tags: ["warm", "neutral", "everyday", "matte", "shimmer"],
+            "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&h=750&q=88",
+          tags: ["necklace", "gold tone", "layered", "everyday", "jewelry"],
           blurb:
-            "Terracotta to bronze — everyday looks and weekend glam in one palette.",
+            "Delicate chains that stack without tangling — easy to dress up or down.",
           reviews: [
             R(
-              "Pigmentation is excellent; blends without muddying.",
+              "Looks pricier than it is; clasp feels secure.",
               "Noa R.",
               5,
             ),
-            R("Great for beginners — minimal fallout.", "Shira F.", 5),
+            R("She wears all three together or one at a time.", "Shira F.", 5),
           ],
         },
         {
           id: "mb1-cool",
-          name: "Cool Smoky Eyeshadow Palette (12 shades)",
+          name: "Sterling silver pendant necklace (minimal bar)",
           priceUSD: 38,
           rating: 4.7,
           image:
-            "https://images.unsplash.com/photo-1512207736890-6ffed8a84e8d?auto=format&fit=crop&w=1200&h=750&q=88",
-          tags: ["cool", "smoky", "dramatic", "shimmer", "evening"],
-          blurb: "Plum, navy, and silver — built for bold evening looks.",
+            "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=1200&h=750&q=88",
+          tags: ["sterling", "silver", "pendant", "minimal", "jewelry"],
+          blurb: "Hypoallergenic 925 silver — clean lines that work with any neckline.",
           reviews: [
-            R("The foil shades are stunning under lights.", "Maya K.", 5),
-            R("Lasts all night with a primer.", "Dana L.", 4),
+            R("Shiny but not flashy; perfect daily piece.", "Maya K.", 5),
+            R("Chain length was just right on her.", "Dana L.", 4),
           ],
         },
       ],
     },
     {
       id: "mb2",
-      name: "K-beauty skincare routine set",
-      blurb: "Cleanser, toner, ampoule, and SPF — a curated shelf starter.",
+      name: "Birthstone stud earrings (sterling or gold tone)",
+      blurb: "Choose their month — subtle sparkle that still feels personal.",
       priceUSD: 68,
       rating: 4.8,
       forGender: "female",
       reviews: [
-        R("Skin feels noticeably calmer after two weeks.", "Liat S.", 5),
-        R("Glass skin results — gave a second set as a gift.", "Talia M.", 5),
+        R("The cut catches light without looking costume-y.", "Liat S.", 5),
+        R("Backings stayed put; no irritation.", "Talia M.", 5),
       ],
     },
     {
       id: "mb3",
-      name: "Professional makeup brush set (15 pcs + holder)",
-      blurb: "Dense synthetic bristles, color-coded handles, easy to wash.",
+      name: "Adjustable chain bracelet + small charm",
+      blurb: "Slim links with a tiny charm — add initials at many jewelers.",
       priceUSD: 45,
       rating: 4.7,
       forGender: "female",
       reviews: [
-        R("These replaced brushes twice the price.", "Inbar C.", 5),
-        R("Holder keeps them upright and tidy on the vanity.", "Gal R.", 5),
+        R("Clasp is easy one-handed; doesn’t snag sweaters.", "Inbar C.", 5),
+        R("Sized up for a gift and it still fit.", "Gal R.", 5),
       ],
     },
     {
       id: "mb4",
-      name: "Gel nail kit (UV lamp + 10 polishes)",
-      blurb: "Salon-finish nails at home; lamp cures in 60 seconds.",
+      name: "Ultrasonic jewelry cleaner (compact tank)",
+      blurb: "Restores sparkle to rings and chains in minutes — safe for most metals.",
       priceUSD: 54,
       rating: 4.6,
       forGender: "female",
       diy: true,
       reviews: [
-        R("Lasts two weeks without chips.", "Yael A.", 5),
-        R("Removal is easy with the included foil wraps.", "Michal T.", 4),
+        R("Even dull earrings came back bright.", "Yael A.", 5),
+        R("Quiet enough to run on the counter.", "Michal T.", 4),
       ],
     },
   ],
@@ -1798,11 +1798,34 @@ export function inferHobbyIdsFromCustomLabels(labels) {
       out.push("pcbuilding");
     }
     if (
+      /\b(jewelry|jewellery|jewelery|necklace|bracelet|earrings?|pendant|charm|\bring\b|gem|sterling|925|anklet|brooch|locket)\b/.test(
+        low,
+      )
+    ) {
+      out.push("makeup");
+    }
+    if (
       /\b(makeup|beauty|cosmetic|skincare|nail|palette|lipstick|foundation|blush|glam)\b/.test(
         low,
       )
     ) {
       out.push("makeup");
+    }
+    if (/\b(chess|shogi|go\s*game)\b/.test(low)) {
+      out.push("gaming");
+    }
+    if (/\b(yoga|pilates|barre|crossfit|marathon|jogging|running|cycling)\b/.test(low)) {
+      out.push("fitness");
+    }
+    if (/\b(knitting|crochet|sewing|quilt|embroidery|needlework)\b/.test(low)) {
+      out.push("crafts");
+    }
+    if (/\b(painting|watercolor|sketch|illustration|pottery)\b/.test(low)) {
+      out.push("crafts");
+      out.push("design");
+    }
+    if (/\b(guitar|piano|drums?|violin|synth|djing)\b/.test(low)) {
+      out.push("music");
     }
     if (
       /\b(pc|pcs|computer|computers|prebuilt|desktop|workstation|rig|gpu|gpus|graphics|nvidia|geforce|radeon|rtx|build|builds|building|rgb|case|cpu|motherboard|ram|cable|fan|cooling|hardware|steam|video\s*game|videogame|ultrawide|nvme)\b/.test(
@@ -1873,7 +1896,7 @@ export function buildPickContext(selectedHobbyIds, customLabels) {
 
   function addGroup(terms) {
     const cleaned = [...new Set(terms.filter(Boolean))].filter(
-      (t) => t.length > 2,
+      (t) => t.length > 1,
     );
     if (!cleaned.length) return;
     const key = [...cleaned].sort().join("\u0001");
@@ -1888,7 +1911,13 @@ export function buildPickContext(selectedHobbyIds, customLabels) {
     addGroup(tokenizePickTerms(`${h.title} ${h.subtitle} ${h.id}`));
   }
   for (const label of customLabels || []) {
-    addGroup(tokenizePickTerms(label));
+    const trimmed = String(label ?? "").trim();
+    if (!trimmed) continue;
+    const low = trimmed.toLowerCase();
+    if (low.length >= 2) {
+      addGroup([low]);
+    }
+    addGroup(tokenizePickTerms(trimmed));
   }
   const inferred = inferHobbyIdsFromCustomLabels(customLabels || []);
   for (const hid of inferred) {
@@ -2088,6 +2117,7 @@ export function getRecommendations({
   );
 
   if (pref === "diy") {
+    const poolBeforeDiy = eligible;
     const diyFromSelected = eligible.filter((g) => rowIsDIY(g));
     if (diyFromSelected.length > 0) {
       eligible = diyFromSelected;
@@ -2108,7 +2138,7 @@ export function getRecommendations({
       if (filteredDiy.length > 0) {
         eligible = filteredDiy;
       } else {
-        eligible = [];
+        eligible = poolBeforeDiy;
       }
     }
   } else if (pref === "experience") {
@@ -2213,8 +2243,9 @@ function scoreForGiftOrder(
   tier,
 ) {
   const p = g.selectedProduct;
+  const tagBlob = Array.isArray(p.tags) ? p.tags.join(" ") : "";
   const hay =
-    `${g.categoryTitle || ""} ${p.name} ${p.blurb || ""}`.toLowerCase();
+    `${g.categoryTitle || ""} ${p.name} ${p.blurb || ""} ${tagBlob}`.toLowerCase();
   const mh = multiHobbyHayBonus(hay, pickContext);
   const r = Number(p.rating) || 0;
   let ratingPenalty = 0;
