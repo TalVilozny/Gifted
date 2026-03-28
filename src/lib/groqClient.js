@@ -35,6 +35,14 @@ function apiBase() {
   return import.meta.env.VITE_GROQ_API_BASE?.trim() || DEFAULT_BASE;
 }
 
+/** Same-origin URL for the serverless Groq proxy (respects Vite `base`). */
+function groqProxyUrl() {
+  const base = import.meta.env.BASE_URL || "/";
+  const root = base.endsWith("/") ? base : `${base}/`;
+  const path = `${root}api/groq`.replace(/\/{2,}/g, "/");
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
 /**
  * @param {string} prompt
  * @param {{ model?: string, temperature?: number, max_tokens?: number }} [options]
@@ -86,18 +94,27 @@ async function completeGroqProxy(prompt, options = {}) {
     },
   };
 
-  const res = await fetch("/api/groq", {
+  const res = await fetch(groqProxyUrl(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-GiftPicker-AI": "groq-proxy",
+    },
     body: JSON.stringify(payload),
   });
 
-  const data = await res.json().catch(() => ({}));
+  const ct = res.headers.get("content-type") || "";
+  const data = ct.includes("application/json")
+    ? await res.json().catch(() => ({}))
+    : await res.text().then((t) => ({ _raw: t }));
+
   if (!res.ok) {
     const msg =
       typeof data.error === "string"
         ? data.error
-        : `Groq proxy error (${res.status})`;
+        : typeof data._raw === "string" && data._raw.includes("<!DOCTYPE")
+          ? `Groq proxy returned HTML (${res.status}) — check /api/groq on your host`
+          : `Groq proxy error (${res.status})`;
     throw new Error(msg);
   }
   if (typeof data.content !== "string") {

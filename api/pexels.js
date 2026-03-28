@@ -5,7 +5,13 @@
  * GET /api/pexels?q=search+terms  → { url: string | null }
  * GET /api/pexels                 → { configured: boolean } (no query)
  */
-import { resolvePexelsImageUrlForQuery } from "../src/lib/pexelsSearchLogic.js";
+import { resolvePexelsImageUrlForQuery } from "../lib/pexelsSearchLogic.js";
+
+function sendJson(res, status, payload) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(payload));
+}
 
 function resolveKey() {
   return (
@@ -26,10 +32,8 @@ function queryFromReq(req) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Content-Type", "application/json");
-
   if (req.method !== "GET") {
-    res.status(405).json({ error: "Method not allowed" });
+    sendJson(res, 405, { error: "Method not allowed" });
     return;
   }
 
@@ -38,21 +42,24 @@ export default async function handler(req, res) {
 
   if (!qRaw) {
     res.setHeader("X-GiftPicker-Images", "pexels-health");
-    res.status(200).json({ configured: Boolean(apiKey) });
+    sendJson(res, 200, { configured: Boolean(apiKey) });
     return;
   }
 
   if (!apiKey) {
-    res.status(503).json({ url: null, error: "Pexels API key not configured" });
+    sendJson(res, 503, {
+      url: null,
+      error: "Pexels API key not configured",
+    });
     return;
   }
 
   try {
     const url = await resolvePexelsImageUrlForQuery(qRaw, apiKey);
     res.setHeader("X-GiftPicker-Images", "pexels-proxy-response");
-    res.status(200).json({ url });
+    sendJson(res, 200, { url });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Pexels request failed";
-    res.status(502).json({ url: null, error: msg });
+    sendJson(res, 502, { url: null, error: msg });
   }
 }

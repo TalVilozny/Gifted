@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => {
                   return;
                 }
                 const { resolvePexelsImageUrlForQuery } = await import(
-                  "./src/lib/pexelsSearchLogic.js"
+                  "./lib/pexelsSearchLogic.js"
                 );
                 const imageUrl = await resolvePexelsImageUrlForQuery(q, apiKey);
                 res.setHeader("Content-Type", "application/json");
@@ -125,7 +125,7 @@ export default defineConfig(({ mode }) => {
             }
 
             try {
-              const { callGroqChat } = await import("./server/groqProxyCore.js");
+              const { callGroqChat } = await import("./lib/groqProxyCore.js");
               const content = await callGroqChat(apiKey, {
                 prompt,
                 model: opt.model,

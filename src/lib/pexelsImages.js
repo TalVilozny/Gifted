@@ -1,6 +1,6 @@
 /** Stock photos via Pexels API — https://www.pexels.com/api/ */
 
-import { resolvePexelsImageUrlForQuery } from "./pexelsSearchLogic.js";
+import { resolvePexelsImageUrlForQuery } from "../../lib/pexelsSearchLogic.js";
 
 const cache = new Map();
 
@@ -17,10 +17,20 @@ export function isPexelsConfigured() {
   );
 }
 
+function pexelsProxyUrl(q) {
+  const base = import.meta.env.BASE_URL || "/";
+  const root = base.endsWith("/") ? base : `${base}/`;
+  const path = `${root}api/pexels?q=${encodeURIComponent(q)}`.replace(
+    /\/{2,}/g,
+    "/",
+  );
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
 async function fetchPexelsViaProxy(query) {
   const q = query.replace(/\s+/g, " ").trim().slice(0, 100);
   if (!q) return null;
-  const res = await fetch(`/api/pexels?q=${encodeURIComponent(q)}`, {
+  const res = await fetch(pexelsProxyUrl(q), {
     headers: { "X-GiftPicker-Images": "pexels-proxy" },
   });
   if (!res.ok) return null;

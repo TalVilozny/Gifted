@@ -1,4 +1,8 @@
 {
+  "functions": {
+    "api/groq.js": { "maxDuration": 60 },
+    "api/pexels.js": { "maxDuration": 30 }
+  },
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     {

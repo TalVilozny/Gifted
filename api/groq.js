@@ -1,8 +1,16 @@
 /**
  * Vercel Serverless Function — calls Groq with a server-only API key.
  * Set GROQ_API_KEY in Project → Environment Variables (no VITE_ prefix).
+ *
+ * Uses raw Node response methods for compatibility (res.json is not always present).
  */
-import { callGroqChat } from "../server/groqProxyCore.js";
+import { callGroqChat } from "../lib/groqProxyCore.js";
+
+function sendJson(res, status, payload) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(payload));
+}
 
 async function readJsonBody(req) {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
@@ -26,26 +34,30 @@ function resolveKey() {
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Content-Type", "application/json");
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.setHeader("Allow", "GET, POST, OPTIONS");
+    res.end();
+    return;
+  }
 
   if (req.method === "GET") {
     const ok = Boolean(resolveKey());
-    res.status(200).json({ configured: ok });
+    res.setHeader("X-GiftPicker-AI", "groq-proxy-health");
+    sendJson(res, 200, { configured: ok });
     return;
   }
 
   if (req.method !== "POST") {
-    res.status(405).json({ error: "Method not allowed" });
+    sendJson(res, 405, { error: "Method not allowed" });
     return;
   }
 
   const apiKey = resolveKey();
   if (!apiKey) {
-    res
-      .status(503)
-      .json({
-        error: "Groq API key not configured on server (set GROQ_API_KEY)",
-      });
+    sendJson(res, 503, {
+      error: "Groq API key not configured on server (set GROQ_API_KEY)",
+    });
     return;
   }
 
@@ -54,28 +66,28 @@ export default async function handler(req, res) {
     try {
       body = await readJsonBody(req);
     } catch {
-      res.status(400).json({ error: "Invalid JSON body" });
+      sendJson(res, 400, { error: "Invalid JSON body" });
       return;
     }
   } else if (typeof body === "string") {
     try {
       body = JSON.parse(body);
     } catch {
-      res.status(400).json({ error: "Invalid JSON body" });
+      sendJson(res, 400, { error: "Invalid JSON body" });
       return;
     }
   } else if (Buffer.isBuffer(body)) {
     try {
       body = JSON.parse(body.toString() || "{}");
     } catch {
-      res.status(400).json({ error: "Invalid JSON body" });
+      sendJson(res, 400, { error: "Invalid JSON body" });
       return;
     }
   }
 
   const { prompt, options = {} } = body || {};
   if (typeof prompt !== "string") {
-    res.status(400).json({ error: "Missing prompt" });
+    sendJson(res, 400, { error: "Missing prompt" });
     return;
   }
 
@@ -94,9 +106,10 @@ export default async function handler(req, res) {
       max_tokens: options.max_tokens,
       baseUrl,
     });
-    res.status(200).json({ content });
+    res.setHeader("X-GiftPicker-AI", "groq-proxy-response");
+    sendJson(res, 200, { content });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Groq request failed";
-    res.status(502).json({ error: msg });
+    sendJson(res, 502, { error: msg });
   }
 }
