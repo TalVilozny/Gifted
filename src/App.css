@@ -303,6 +303,17 @@ h4 {
   color: var(--muted);
 }
 
+/* In-flow on small screens so the panel height reserves space and does not cover results */
+@media (max-width: 720px) {
+  .DislikesManager {
+    position: relative;
+    top: auto;
+    inset-inline-end: auto;
+    width: 100%;
+    align-self: stretch;
+  }
+}
+
 .Main {
   flex: 1;
 }
@@ -2153,6 +2164,10 @@ h4 {
     grid-template-columns: 1fr;
   }
 
+  .Header {
+    display: block;
+  }
+
   .GiftCard__media {
     min-height: 180px;
   }
@@ -2160,6 +2175,16 @@ h4 {
   .GiftCard__img {
     min-height: 180px;
     max-height: 220px;
+  }
+
+  .Header__actions {
+    margin-top: 20px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .Btn--ghost {
+    white-space: nowrap;
   }
 
   .GiftCard__head {
