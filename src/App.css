@@ -83,7 +83,7 @@ h4 {
 
 .Header {
   display: flex;
-  align-items: flex-start;
+  align-items: start;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 2rem;
@@ -129,14 +129,136 @@ h4 {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: end;
   gap: 0.55rem;
+}
+
+.Header__actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.LangSelect {
+  position: relative;
+  display: inline-block;
+  min-width: 10.5rem;
+  z-index: 20;
+}
+
+.LangSelect__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: start;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.LangSelect__trigger:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+.LangSelect__trigger--open {
+  border-color: rgba(139, 92, 246, 0.55);
+}
+
+.LangSelect__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.LangSelect__triggerLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.LangSelect__caret {
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid rgba(148, 163, 184, 0.95);
+  transition: transform 0.15s ease;
+}
+
+.LangSelect__trigger--open .LangSelect__caret {
+  transform: rotate(180deg);
+}
+
+.LangSelect__menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  inset-inline: 0;
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  background: rgba(22, 22, 28, 0.98);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.LangSelect__menuItem {
+  margin: 0;
+  padding: 0;
+}
+
+.LangSelect__option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.LangSelect__option:hover,
+.LangSelect__option:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+.LangSelect__option--active {
+  color: var(--text, #e2e8f0);
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.LangSelect__optionFlag {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .DislikesManager {
   position: absolute;
   top: calc(100% + 0.35rem);
-  right: 0;
+  inset-inline-end: 0;
   z-index: 6;
   width: min(420px, 92vw);
   border: 1px solid var(--stroke);
@@ -244,7 +366,7 @@ h4 {
   border: none;
   background: transparent;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
 }
 
 .Footer__disclaimer {
@@ -317,7 +439,7 @@ h4 {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  justify-content: flex-end;
+  justify-content: end;
   margin-top: 2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--stroke);
@@ -370,7 +492,7 @@ h4 {
 .ChoiceCard {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: start;
   gap: 0.35rem;
   padding: 1.35rem 1.25rem;
   border-radius: var(--radius-md);
@@ -378,7 +500,7 @@ h4 {
   background: rgba(255, 255, 255, 0.02);
   color: inherit;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   transition:
     border-color 0.2s,
     transform 0.2s,
@@ -431,7 +553,7 @@ h4 {
   );
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: start;
   gap: 0.4rem;
   padding: 1.1rem 1rem 1.15rem;
   border-radius: var(--radius-md);
@@ -439,7 +561,7 @@ h4 {
   background: var(--hobby-bg);
   color: inherit;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   transition:
     border-color 0.2s,
     box-shadow 0.2s,
@@ -617,7 +739,7 @@ h4 {
 .BudgetUnlimited {
   display: flex;
   gap: 0.75rem;
-  align-items: flex-start;
+  align-items: start;
   margin-bottom: 1.25rem;
   padding: 0.9rem 1rem 0.95rem;
   border-radius: var(--radius-md);
@@ -712,6 +834,11 @@ h4 {
   );
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
   pointer-events: none;
+}
+
+/* Mirror track fill so gold grows from the inline-end (right in LTR, left in RTL) */
+[dir="rtl"] .RangeWrap::before {
+  transform: translateY(-50%) scaleX(-1);
 }
 
 .RangeWrap::after {
@@ -990,8 +1117,7 @@ h4 {
 
 .GiftCard__media .GiftCard__ribbon {
   top: 0.65rem;
-  left: 0.65rem;
-  right: auto;
+  inset-inline-start: 0.65rem;
 }
 
 .GiftCard__img {
@@ -1147,7 +1273,7 @@ h4 {
   flex-wrap: wrap;
   gap: 1rem;
   justify-content: space-between;
-  padding-right: 0;
+  padding-inline-end: 0;
 }
 
 .GiftCard--top .GiftCard__head {
@@ -1212,7 +1338,7 @@ h4 {
 .GiftCard__scoreCol {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: end;
   gap: 0.65rem;
   min-width: 8.5rem;
 }
@@ -1220,7 +1346,7 @@ h4 {
 .GiftCard__score {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: end;
   gap: 0.35rem;
   min-width: 7rem;
 }
@@ -1234,7 +1360,7 @@ h4 {
 .GiftCard__priceMeta {
   font-size: 0.78rem;
   color: var(--muted);
-  text-align: right;
+  text-align: end;
   line-height: 1.4;
 }
 
@@ -1333,7 +1459,8 @@ h4 {
 }
 
 .DIYToggle__hint {
-  margin: 0.45rem 0 0 1.7rem;
+  margin: 0.45rem 0 0;
+  margin-inline-start: 1.7rem;
   font-size: 0.85rem;
   color: var(--muted);
   line-height: 1.45;
@@ -1369,7 +1496,7 @@ h4 {
   margin: 0;
   font: inherit;
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .GiftedLogo--home:focus-visible {
@@ -1506,6 +1633,10 @@ h4 {
   pointer-events: none;
 }
 
+[dir="rtl"] .AgeSlider__trackWrap::before {
+  transform: translateY(-50%) scaleX(-1);
+}
+
 .AgeSlider__range {
   -webkit-appearance: none;
   appearance: none;
@@ -1579,14 +1710,14 @@ h4 {
 .GiftPrefCard {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: start;
   gap: 0.35rem;
   padding: 0.9rem 1rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--stroke);
   background: rgba(0, 0, 0, 0.25);
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   font: inherit;
   color: inherit;
   transition:
@@ -1687,7 +1818,7 @@ h4 {
 
 .DiyTutorials__list {
   margin: 0;
-  padding-left: 1rem;
+  padding-inline-start: 1rem;
   display: grid;
   gap: 0.55rem;
 }
@@ -1756,7 +1887,7 @@ h4 {
 .GiftCard__votes {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: end;
   gap: 0.45rem;
   margin: 0;
 }
@@ -1810,7 +1941,7 @@ h4 {
   inset: 0;
   z-index: 100;
   display: flex;
-  align-items: flex-start;
+  align-items: start;
   justify-content: center;
   padding: 1.25rem;
   padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
@@ -1963,7 +2094,7 @@ h4 {
   align-items: center;
   justify-content: center;
   padding: 0.5rem 0.65rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-inline-end: 1px solid rgba(255, 255, 255, 0.06);
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.06),
@@ -2032,19 +2163,19 @@ h4 {
   }
 
   .GiftCard__head {
-    padding-right: 0;
+    padding-inline-end: 0;
   }
 
   .GiftCard__scoreCol {
-    align-items: flex-start;
+    align-items: start;
     width: 100%;
   }
 
   .GiftCard__votes {
-    justify-content: flex-start;
+    justify-content: start;
   }
 
   .GiftCard__score {
-    align-items: flex-start;
+    align-items: start;
   }
 }

@@ -15,13 +15,17 @@ export async function refineWithGroq({
   budgetUSD,
   categoryTitle,
   budgetUnlimited = false,
+  minBudgetUSD = 0,
 }) {
   if (!isGroqConfigured()) return null;
 
+  const min = Math.max(0, Number(minBudgetUSD) || 0);
   const budgetHint =
     budgetUnlimited || !Number.isFinite(budgetUSD)
       ? "User has UNLIMITED budget—prefer the most premium option in the list that fits their request."
-      : `Prefer priceUSD <= ${Number(budgetUSD).toFixed(2)} when possible.`;
+      : min > 0
+        ? `Prefer ${Number(min).toFixed(2)} <= priceUSD <= ${Number(budgetUSD).toFixed(2)} when possible.`
+        : `Prefer priceUSD <= ${Number(budgetUSD).toFixed(2)} when possible.`;
 
   const catalog = variants.map((v) => ({
     id: v.id,

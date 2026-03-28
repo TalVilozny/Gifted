@@ -138,7 +138,7 @@ export const hobbies = [
   },
   {
     id: "pcbuilding",
-    title: "PC & video games",
+    title: "PC",
     subtitle: "Steam, builds, RGB, GPUs, and desk upgrades",
     cardGradient:
       "linear-gradient(145deg, rgba(14, 165, 233, 0.2), rgba(99, 102, 241, 0.14))",
@@ -193,7 +193,11 @@ export const giftsByHobby = {
           blurb:
             "Adaptive triggers and haptics—special if they’re on PlayStation.",
           reviews: [
-            R("Haptics make racing games feel absurdly immersive.", "Riley P.", 5),
+            R(
+              "Haptics make racing games feel absurdly immersive.",
+              "Riley P.",
+              5,
+            ),
             R("Check they own a PS5 first.", "Chris L.", 4),
           ],
         },
@@ -205,8 +209,7 @@ export const giftsByHobby = {
           image:
             "https://images.unsplash.com/photo-1592840496694-26d035b3b1fb?auto=format&fit=crop&w=1200&h=750&q=88",
           tags: ["wireless", "bluetooth", "retro", "switch", "pc"],
-          blurb:
-            "Deep customization, great D-pad—strong for Switch + PC.",
+          blurb: "Deep customization, great D-pad—strong for Switch + PC.",
           reviews: [
             R("Profiles per game changed how I play fighters.", "Morgan D.", 5),
             R("Firmware updates are frequent.", "Casey W.", 5),
@@ -223,7 +226,11 @@ export const giftsByHobby = {
           blurb:
             "Trackpads and back paddles for couch PC gaming—niche but loved.",
           reviews: [
-            R("Weird at first, then I couldn’t go back for strategy games.", "Sam T.", 4),
+            R(
+              "Weird at first, then I couldn’t go back for strategy games.",
+              "Sam T.",
+              4,
+            ),
             R("Not for everyone—know their taste.", "Priya N.", 4),
           ],
         },
@@ -249,7 +256,11 @@ export const giftsByHobby = {
       rating: 4.6,
       forGender: null,
       reviews: [
-        R("Desk looks like a streamer setup now—in a good way.", "Morgan D.", 5),
+        R(
+          "Desk looks like a streamer setup now—in a good way.",
+          "Morgan D.",
+          5,
+        ),
         R("Mat is huge; measure their desk first.", "Casey W.", 4),
       ],
     },
@@ -275,7 +286,11 @@ export const giftsByHobby = {
       rating: 4.8,
       forGender: null,
       reviews: [
-        R("Makes cardio feel like a game. Streaks are addictive.", "Nina S.", 5),
+        R(
+          "Makes cardio feel like a game. Streaks are addictive.",
+          "Nina S.",
+          5,
+        ),
         R("Smooth rotation; counts feel accurate.", "Oren B.", 4),
       ],
     },
@@ -467,7 +482,11 @@ export const giftsByHobby = {
           blurb:
             "Dual wireless, retractable mic, subtle RGB—great for PC + console.",
           reviews: [
-            R("Finally a headset that doesn’t squeeze my glasses.", "Jake R.", 5),
+            R(
+              "Finally a headset that doesn’t squeeze my glasses.",
+              "Jake R.",
+              5,
+            ),
             R("Software EQ is powerful once you dig in.", "Tina S.", 5),
           ],
         },
@@ -479,8 +498,7 @@ export const giftsByHobby = {
           image:
             "https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=1200&h=750&q=88",
           tags: ["wireless", "gaming", "comfort", "microphone"],
-          blurb:
-            "Long-session comfort, warm sound—less flashy, very reliable.",
+          blurb: "Long-session comfort, warm sound—less flashy, very reliable.",
           reviews: [
             R("Mic is clearer than my last wireless set.", "Omar D.", 5),
             R("No RGB—exactly what I wanted.", "Elena V.", 5),
@@ -661,7 +679,7 @@ export const giftsByHobby = {
     },
     {
       id: "k2",
-      name: "Japanese chef knife (8\")",
+      name: 'Japanese chef knife (8")',
       blurb: "Sharp out of the box; saya sheath included.",
       priceUSD: 110,
       rating: 4.8,
@@ -984,7 +1002,11 @@ export const giftsByHobby = {
           blurb:
             "Terracotta to bronze — everyday looks and weekend glam in one palette.",
           reviews: [
-            R("Pigmentation is excellent; blends without muddying.", "Noa R.", 5),
+            R(
+              "Pigmentation is excellent; blends without muddying.",
+              "Noa R.",
+              5,
+            ),
             R("Great for beginners — minimal fallout.", "Shira F.", 5),
           ],
         },
@@ -1089,7 +1111,11 @@ export const giftsByHobby = {
           blurb:
             "Larger blades, lower RPM, quieter — check your case supports 140 mm.",
           reviews: [
-            R("Near-silent at 800 RPM; temps dropped 4 \u00b0C.", "Yuval K.", 5),
+            R(
+              "Near-silent at 800 RPM; temps dropped 4 \u00b0C.",
+              "Yuval K.",
+              5,
+            ),
             R("Verify 140 mm clearance before ordering.", "Ido L.", 5),
           ],
         },
@@ -1195,7 +1221,11 @@ export const giftsByHobby = {
           blurb:
             "Showpiece build—maxed for 4K / high-refresh and heavy creative workloads.",
           reviews: [
-            R("Looks like a boutique builder charged twice as much.", "Dean L.", 5),
+            R(
+              "Looks like a boutique builder charged twice as much.",
+              "Dean L.",
+              5,
+            ),
             R("GPU temps under load are ice-cold.", "Priya M.", 5),
           ],
         },
@@ -1218,7 +1248,11 @@ export const giftsByHobby = {
             "Sweet spot for 1440p high settings—big upgrade path from older cards.",
           reviews: [
             R("Huge uplift from my 20-series card.", "Alexei V.", 5),
-            R("Fits standard ATX cases; triple-slot check your clearance.", "Sam W.", 4),
+            R(
+              "Fits standard ATX cases; triple-slot check your clearance.",
+              "Sam W.",
+              4,
+            ),
           ],
         },
         {
@@ -1228,15 +1262,7 @@ export const giftsByHobby = {
           rating: 4.8,
           image:
             "https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=1200&h=750&q=88",
-          tags: [
-            "gpu",
-            "graphics",
-            "nvidia",
-            "rtx",
-            "pc",
-            "gaming",
-            "4k",
-          ],
+          tags: ["gpu", "graphics", "nvidia", "rtx", "pc", "gaming", "4k"],
           blurb:
             "Comfortable 4K gaming and heavy ray tracing—pair with a strong PSU.",
           reviews: [
@@ -1264,7 +1290,11 @@ export const giftsByHobby = {
           blurb:
             "Top of the stack for 4K max settings and creative GPU loads—check case length and PSU headroom.",
           reviews: [
-            R("Brutal performance; my CPU is the bottleneck now.", "Chris T.", 5),
+            R(
+              "Brutal performance; my CPU is the bottleneck now.",
+              "Chris T.",
+              5,
+            ),
             R("Included support bracket saved my PCIe slot.", "Jordan A.", 5),
           ],
         },
@@ -1277,12 +1307,20 @@ export const giftsByHobby = {
       variants: [
         {
           id: "pc7-27qhd",
-          name: "27\" QHD 165 Hz IPS gaming monitor",
+          name: '27" QHD 165 Hz IPS gaming monitor',
           priceUSD: 329,
           rating: 4.6,
           image:
             "https://images.unsplash.com/photo-1527443224154-c649a890e0a2?auto=format&fit=crop&w=1200&h=750&q=88",
-          tags: ["monitor", "display", "1440p", "gaming", "ips", "pc", "screen"],
+          tags: [
+            "monitor",
+            "display",
+            "1440p",
+            "gaming",
+            "ips",
+            "pc",
+            "screen",
+          ],
           blurb:
             "Fast, sharp panel for competitive and story games—great first serious upgrade.",
           reviews: [
@@ -1292,12 +1330,19 @@ export const giftsByHobby = {
         },
         {
           id: "pc7-ultrawide",
-          name: "34\" ultrawide curved 144 Hz (immersive / productivity)",
+          name: '34" ultrawide curved 144 Hz (immersive / productivity)',
           priceUSD: 799,
           rating: 4.8,
           image:
             "https://images.unsplash.com/photo-1527443224154-c649a890e0a2?auto=format&fit=crop&w=1200&h=750&q=88",
-          tags: ["monitor", "ultrawide", "curved", "gaming", "pc", "productivity"],
+          tags: [
+            "monitor",
+            "ultrawide",
+            "curved",
+            "gaming",
+            "pc",
+            "productivity",
+          ],
           blurb:
             "Racing and sims feel cinematic; split-screen work without dual mounts.",
           reviews: [
@@ -1307,7 +1352,7 @@ export const giftsByHobby = {
         },
         {
           id: "pc7-oled",
-          name: "32\" 4K OLED gaming monitor (HDR, high refresh)",
+          name: '32" 4K OLED gaming monitor (HDR, high refresh)',
           priceUSD: 1299,
           rating: 4.9,
           image:
@@ -1341,7 +1386,11 @@ export const giftsByHobby = {
           blurb:
             "Classic three-hander with exhibition caseback—timeless milestone gift.",
           reviews: [
-            R("Wears smaller than the spec sheet—perfect on my 6.5\" wrist.", "Daniel K.", 5),
+            R(
+              'Wears smaller than the spec sheet—perfect on my 6.5" wrist.',
+              "Daniel K.",
+              5,
+            ),
             R("Authorized dealer card included; peace of mind.", "Sarah M.", 5),
           ],
         },
@@ -1356,7 +1405,11 @@ export const giftsByHobby = {
           blurb:
             "Tool-watch vibe with serious wrist presence—great for drivers and travelers.",
           reviews: [
-            R("Lume is insane at night; chrono pushers feel crisp.", "Marcus T.", 5),
+            R(
+              "Lume is insane at night; chrono pushers feel crisp.",
+              "Marcus T.",
+              5,
+            ),
             R("Heavy—exactly what I wanted.", "James L.", 5),
           ],
         },
@@ -1378,8 +1431,7 @@ export const giftsByHobby = {
     {
       id: "lx3",
       name: "Designer leather tote (structured, neutral)",
-      blurb:
-        "Full-grain leather, feet on the base, room for laptop + life.",
+      blurb: "Full-grain leather, feet on the base, room for laptop + life.",
       priceUSD: 2400,
       rating: 4.8,
       forGender: "female",
@@ -1401,10 +1453,13 @@ export const giftsByHobby = {
           image:
             "https://images.unsplash.com/photo-1516035069371-29a1b244ccff?auto=format&fit=crop&w=1200&h=750&q=88",
           tags: ["camera", "full-frame", "photography", "pro"],
-          blurb:
-            "IBIS, fast AF, 4K log—upgrade they’ll feel every shoot.",
+          blurb: "IBIS, fast AF, 4K log—upgrade they’ll feel every shoot.",
           reviews: [
-            R("Low light is a different world vs my old crop body.", "Alex P.", 5),
+            R(
+              "Low light is a different world vs my old crop body.",
+              "Alex P.",
+              5,
+            ),
             R("Battery grip worth it for event days.", "Jordan K.", 4),
           ],
         },
@@ -1416,10 +1471,13 @@ export const giftsByHobby = {
           image:
             "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&w=1200&h=750&q=88",
           tags: ["lens", "zoom", "pro", "photography"],
-          blurb:
-            "The workhorse lens for weddings, travel, and paid gigs.",
+          blurb: "The workhorse lens for weddings, travel, and paid gigs.",
           reviews: [
-            R("Sharp wide open; weather sealing saved me in rain.", "Chris L.", 5),
+            R(
+              "Sharp wide open; weather sealing saved me in rain.",
+              "Chris L.",
+              5,
+            ),
             R("Heavy but balanced on my grip body.", "Maya F.", 5),
           ],
         },
@@ -1467,7 +1525,11 @@ export const giftsByHobby = {
           blurb:
             "Hours of focused play; they can rebuild into different models.",
           reviews: [
-            R("Instructions are clear; we built together on day one.", "Sam T.", 5),
+            R(
+              "Instructions are clear; we built together on day one.",
+              "Sam T.",
+              5,
+            ),
             R("Box is gift-ready with a fun print.", "Priya L.", 5),
           ],
         },
@@ -1532,8 +1594,7 @@ export const giftsByHobby = {
     {
       id: "kd4",
       name: "Board game night starter (family-friendly)",
-      blurb:
-        "Quick rules, laughs in 20 minutes—great for siblings or friends.",
+      blurb: "Quick rules, laughs in 20 minutes—great for siblings or friends.",
       priceUSD: 28,
       rating: 4.8,
       forGender: null,
@@ -1894,17 +1955,25 @@ export function finalizeGiftRow(
   sourceHobbyId,
   budgetUnlimited,
   pickContext = null,
+  minBudgetUSD = 0,
 ) {
   const expanded = expandGiftRow(g);
   const cap = budgetUnlimited ? Infinity : budgetUSD;
+  const min = budgetUnlimited ? 0 : Math.max(0, Number(minBudgetUSD) || 0);
   const selected = pickContext?.groups?.length
-    ? pickBestVariantForBudgetScored(expanded.variants, cap, pickContext)
-    : pickBestVariantForBudget(expanded.variants, cap);
+    ? pickBestVariantForBudgetScored(expanded.variants, cap, pickContext, min)
+    : pickBestVariantForBudget(expanded.variants, cap, min);
+  if (!selected) {
+    return null;
+  }
+  const inWindow =
+    budgetUnlimited ||
+    (selected.priceUSD <= budgetUSD && (min <= 0 || selected.priceUSD >= min));
   return {
     ...expanded,
     _sourceHobbyId: sourceHobbyId,
     selectedProduct: selected,
-    _inBudget: budgetUnlimited || selected.priceUSD <= budgetUSD,
+    _inBudget: inWindow,
   };
 }
 
@@ -1916,7 +1985,8 @@ export function finalizeGiftRow(
  *   budgetUSD: number,
  *   wantDIY?: boolean,
  *   giftPreference?: 'diy' | 'experience' | 'premade',
- *   budgetUnlimited?: boolean
+ *   budgetUnlimited?: boolean,
+ *   minBudgetUSD?: number,
  * }} params
  */
 export function getRecommendations({
@@ -1927,6 +1997,7 @@ export function getRecommendations({
   wantDIY = false,
   giftPreference,
   budgetUnlimited = false,
+  minBudgetUSD = 0,
 }) {
   const pref = giftPreference ?? (wantDIY ? "diy" : "premade");
   const pickContext = buildPickContext(selectedHobbyIds, customLabels);
@@ -2003,9 +2074,18 @@ export function getRecommendations({
     if (exp.length > 0) eligible = exp;
   }
 
-  let finalized = eligible.map((g) =>
-    finalizeGiftRow(g, budgetUSD, g._sourceHobbyId, budgetUnlimited, pickContext),
-  );
+  let finalized = eligible
+    .map((g) =>
+      finalizeGiftRow(
+        g,
+        budgetUSD,
+        g._sourceHobbyId,
+        budgetUnlimited,
+        pickContext,
+        minBudgetUSD,
+      ),
+    )
+    .filter(Boolean);
 
   if (budgetUnlimited) {
     const premium = finalized.filter(
@@ -2050,7 +2130,8 @@ function multiHobbyHayBonus(hay, pickContext) {
 
 function scoreFinalizedGiftRow(g, budgetUSD, budgetUnlimited, pickContext) {
   const p = g.selectedProduct;
-  const hay = `${g.categoryTitle || ""} ${p.name} ${p.blurb || ""}`.toLowerCase();
+  const hay =
+    `${g.categoryTitle || ""} ${p.name} ${p.blurb || ""}`.toLowerCase();
   const mh = multiHobbyHayBonus(hay, pickContext);
   const r = Number(p.rating) || 0;
   let ratingPenalty = 0;
@@ -2081,8 +2162,18 @@ function sortGiftsByBudgetFit(
   pickContext = null,
 ) {
   return [...pool].sort((a, b) => {
-    const sa = scoreFinalizedGiftRow(a, budgetUSD, budgetUnlimited, pickContext);
-    const sb = scoreFinalizedGiftRow(b, budgetUSD, budgetUnlimited, pickContext);
+    const sa = scoreFinalizedGiftRow(
+      a,
+      budgetUSD,
+      budgetUnlimited,
+      pickContext,
+    );
+    const sb = scoreFinalizedGiftRow(
+      b,
+      budgetUSD,
+      budgetUnlimited,
+      pickContext,
+    );
     if (sb !== sa) return sb - sa;
     const ra = Number(a.selectedProduct.rating) || 0;
     const rb = Number(b.selectedProduct.rating) || 0;

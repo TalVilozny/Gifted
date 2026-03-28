@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import GiftedLight from "./Icons/GiftedLight.png";
 import GiftedLogo from "./Icons/GiftedLogo.png";
+import langEnFlag from "./Icons/USAFlag.png";
+import langHeFlag from "./Icons/IsraelFlag.png";
+import { hobbyTitleSubtitle, LOCALE_STORAGE_KEY, makeT } from "./i18n/index.js";
 import {
   buildPickContext,
   CURRENCIES,
@@ -72,10 +75,23 @@ function stampGiftIdsForResult(rec) {
   };
 }
 
-function Stars({ value, max = 5 }) {
+function dropGiftsBelowMinBudget(rec, minUsd, budgetUnlimited) {
+  if (budgetUnlimited || !rec?.gifts?.length || !(minUsd > 0)) return rec;
+  const kept = rec.gifts.filter((g) => {
+    const p = Number(g.selectedProduct?.priceUSD);
+    return Number.isFinite(p) && p >= minUsd - 0.01;
+  });
+  if (kept.length === rec.gifts.length) return rec;
+  return { ...rec, gifts: kept };
+}
+
+function Stars({ value, max = 5, ariaLabel }) {
   const full = Math.round(value);
   return (
-    <span className="Stars" aria-label={`${value} out of ${max} stars`}>
+    <span
+      className="Stars"
+      aria-label={ariaLabel ?? `${value} out of ${max} stars`}
+    >
       {Array.from({ length: max }, (_, i) => (
         <span key={i} className={i < full ? "Stars__on" : "Stars__off"}>
           ★
@@ -117,6 +133,76 @@ function giftSearchTextForHobbyFilter(gift) {
     }
   }
   return parts.join(" ").toLowerCase();
+}
+
+function hobbyCatalogFilterTerms(hobbyId) {
+  const h = hobbies.find((x) => x.id === hobbyId);
+  if (!h) return [];
+  const raw = `${h.title} ${h.subtitle ?? ""} ${h.id}`.toLowerCase();
+  return [
+    ...new Set(
+      raw
+        .split(/[^a-z0-9+]+/i)
+        .map((t) => t.trim())
+        .filter((t) => t.length > 2),
+    ),
+  ];
+}
+
+/** Preset chip: source hobby id OR keywords from that catalog hobby’s title/subtitle. */
+function giftMatchesPresetHobbyFilter(gift, hobbyId) {
+  if (gift._sourceHobbyId === hobbyId) return true;
+  const terms = hobbyCatalogFilterTerms(hobbyId);
+  if (!terms.length) return false;
+  const hay = giftSearchTextForHobbyFilter(gift);
+  return terms.some((t) => hay.includes(t));
+}
+
+const STEM_SUFFIX_RE = /(?:ing|ers|ies|es|s)$/i;
+
+function stemForHobbyToken(t) {
+  const s = String(t || "")
+    .toLowerCase()
+    .replace(STEM_SUFFIX_RE, "");
+  return s.length > 2 ? s : "";
+}
+
+/**
+ * Custom chip: label text/stems in gift copy, OR inferred catalog id on the row that
+ * is not one of the user’s explicitly selected preset tiles (avoids “all rows are
+ * gaming” when sim-racing text is what matters).
+ */
+function giftMatchesCustomHobbyFilter(gift, customLabel, selectedHobbyIds) {
+  const needle = String(customLabel).toLowerCase();
+  const hay = giftSearchTextForHobbyFilter(gift);
+  if (needle && hay.includes(needle)) return true;
+  const tokens = needle
+    .split(/[^a-z0-9+]+/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3);
+  const hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
+  for (const tok of tokens) {
+    if (hay.includes(tok)) return true;
+    const ts = stemForHobbyToken(tok);
+    if (!ts) continue;
+    if (
+      hayWords.some(
+        (w) =>
+          stemForHobbyToken(w) === ts ||
+          w.startsWith(ts) ||
+          ts.startsWith(w) ||
+          w.includes(ts),
+      )
+    ) {
+      return true;
+    }
+  }
+  const inferred = inferHobbyIdsFromCustomLabels([customLabel]);
+  const sid = gift._sourceHobbyId;
+  if (inferred.includes(sid) && !(selectedHobbyIds ?? []).includes(sid)) {
+    return true;
+  }
+  return false;
 }
 
 const RECIPIENT_RELATIONS = [
@@ -194,47 +280,49 @@ function recipientIdToGender(id) {
   }
 }
 
-/** Short label for budget recap */
-function recipientRecapLabel(id) {
+/** Short label for budget recap (translated). */
+function recipientRecapLabel(id, t) {
   if (typeof id === "string" && id.startsWith("group-")) {
     const groupKind = id.split("-")[1] ?? "group";
-    const pretty =
+    const key =
       groupKind === "workmates"
-        ? "workmates"
+        ? "recap_group_workmates"
         : groupKind === "party"
-          ? "party"
+          ? "recap_group_party"
           : groupKind === "family"
-            ? "family"
+            ? "recap_group_family"
             : groupKind === "friends"
-              ? "friends"
+              ? "recap_group_friends"
               : groupKind === "team"
-                ? "team"
-                : groupKind;
-    return `your ${pretty}`;
+                ? "recap_group_team"
+                : groupKind === "class"
+                  ? "recap_group_class"
+                  : "recap_group_generic";
+    return t(key);
   }
   switch (id) {
     case "boyfriend":
-      return "your boyfriend";
+      return t("recap_bf");
     case "girlfriend":
-      return "your girlfriend";
+      return t("recap_gf");
     case "mom":
-      return "your mom";
+      return t("recap_mom");
     case "dad":
-      return "your dad";
+      return t("recap_dad");
     case "friend":
-      return "your friend";
+      return t("recap_friend");
     case "kid":
-      return "your kid";
+      return t("recap_kid");
     case "male":
-      return "a man";
+      return t("recap_man");
     case "female":
-      return "a woman";
+      return t("recap_woman");
     case "nonbinary":
-      return "a nonbinary person";
+      return t("recap_nb");
     case "other":
-      return "someone";
+      return t("recap_someone");
     default:
-      return "them";
+      return t("recap_them");
   }
 }
 
@@ -388,7 +476,7 @@ function firstSignificantProductWord(name) {
  * @param {{ id: string, _sourceHobbyId?: string, categoryTitle?: string }} gift
  * @param {{ name?: string }} product
  */
-function refinePlaceholderForGift(gift, product) {
+function refinePlaceholderForGift(gift, product, t) {
   const hid = gift._sourceHobbyId;
   const pool =
     REFINE_PLACEHOLDER_BY_HOBBY[hid] ?? REFINE_PLACEHOLDER_BY_HOBBY.general;
@@ -402,7 +490,7 @@ function refinePlaceholderForGift(gift, product) {
   if (useWord) {
     const combined = `${word} — ${line}`;
     if (combined.length <= 58) {
-      return `e.g. "${combined}"`;
+      return t("refine_eg", { text: combined });
     }
   }
 
@@ -410,11 +498,11 @@ function refinePlaceholderForGift(gift, product) {
   if (cat && seed % 3 === 0 && cat.length <= 28) {
     const withCat = `${cat}: ${line}`;
     if (withCat.length <= 58) {
-      return `e.g. "${withCat}"`;
+      return t("refine_eg", { text: withCat });
     }
   }
 
-  return `e.g. "${line}"`;
+  return t("refine_eg", { text: line });
 }
 
 /** Horizontal picker strip — item width in px (must match CSS). */
@@ -544,13 +632,71 @@ function isSubscriptionLikeGift(gift, product) {
   );
 }
 
-function buildImageSearchQuery(product, gift) {
-  const base = `${product?.name ?? ""} ${gift?.categoryTitle ?? ""}`.trim();
-  const normalized = base
+function buildImageSearchQuery(product, gift, interestHints = []) {
+  const stop = new Set([
+    "gift",
+    "perfect",
+    "great",
+    "best",
+    "premium",
+    "deluxe",
+    "set",
+    "kit",
+    "the",
+    "for",
+    "and",
+    "with",
+    "your",
+    "their",
+    "this",
+    "that",
+  ]);
+  const clean = (s) =>
+    String(s ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const nameWords = clean(product?.name)
+    .split(" ")
+    .filter((w) => w.length > 2 && !stop.has(w))
+    .slice(0, 7);
+  const tagBits = (Array.isArray(product?.tags) ? product.tags : [])
+    .map((t) => clean(t))
+    .filter(Boolean)
+    .slice(0, 4);
+  const blurbWords = clean(product?.blurb)
+    .split(" ")
+    .filter((w) => w.length > 4 && !stop.has(w))
+    .slice(0, 3);
+  const catWords = clean(gift?.categoryTitle)
+    .split(" ")
+    .filter((w) => w.length > 2 && !stop.has(w))
+    .slice(0, 4);
+  const hintWords = (Array.isArray(interestHints) ? interestHints : [])
+    .flatMap((h) => clean(h).split(" "))
+    .filter((w) => w.length > 2 && !stop.has(w))
+    .slice(0, 4);
+  const ordered = [
+    ...nameWords,
+    ...tagBits.flatMap((t) => t.split(" ").filter((w) => w.length > 2)),
+    ...blurbWords,
+    ...catWords,
+    ...hintWords,
+  ].filter(Boolean);
+  const deduped = [];
+  const seen = new Set();
+  for (const w of ordered) {
+    if (seen.has(w)) continue;
+    seen.add(w);
+    deduped.push(w);
+  }
+  const core = deduped.join(" ").slice(0, 100);
+  const normalized = core
     .replace(/\bmousepad\b/gi, "mouse pad")
     .replace(/\bheadset\b/gi, "headphones")
     .replace(/\bkeycap\b/gi, "keyboard keycap");
-  return `${normalized} product photo`.trim();
+  return `${normalized} product`.trim();
 }
 
 function ProductImage({ searchQuery, fallbackSrc, usePexels = true }) {
@@ -636,6 +782,10 @@ export default function App() {
   const [countryCode, setCountryCode] = useState("US");
   const [currency, setCurrency] = useState("USD");
   const [budgetSlider, setBudgetSlider] = useState(75);
+  /** Display-currency amount; must stay ≤ `budgetSlider` (ignored when endless budget is on). */
+  const [budgetMinSlider, setBudgetMinSlider] = useState(0);
+  /** When true, `recommendationMinBudgetUsd` uses `budgetMinSlider`; slider is shown. */
+  const [minimumBudgetEnabled, setMinimumBudgetEnabled] = useState(false);
   const [budgetUnlimited, setBudgetUnlimited] = useState(false);
   const [budgetAmountText, setBudgetAmountText] = useState("");
   const [isBudgetAmountEditing, setIsBudgetAmountEditing] = useState(false);
@@ -653,10 +803,91 @@ export default function App() {
   const [openingGiftId, setOpeningGiftId] = useState(null);
   const [wantThisErrorByGiftId, setWantThisErrorByGiftId] = useState({});
 
+  const [locale, setLocale] = useState(() => {
+    if (typeof window === "undefined") return "en";
+    try {
+      return window.localStorage.getItem(LOCALE_STORAGE_KEY) === "he"
+        ? "he"
+        : "en";
+    } catch {
+      return "en";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    } catch {
+      /* ignore */
+    }
+  }, [locale]);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const he = locale === "he";
+      document.documentElement.lang = he ? "he" : "en";
+      document.documentElement.dir = he ? "rtl" : "ltr";
+    }
+  }, [locale]);
+
+  const t = useMemo(() => makeT(locale), [locale]);
+
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langSelectRef = useRef(null);
+
+  useEffect(() => {
+    if (!langMenuOpen) return;
+    function handlePointerDown(e) {
+      if (
+        langSelectRef.current &&
+        !langSelectRef.current.contains(/** @type {Node} */ (e.target))
+      ) {
+        setLangMenuOpen(false);
+      }
+    }
+    function handleKey(e) {
+      if (e.key === "Escape") setLangMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [langMenuOpen]);
+
   const budgetAnimateRafRef = useRef(null);
 
   const groqReady = useMemo(() => isGroqConfigured(), []);
   const pexelsReady = useMemo(() => isPexelsConfigured(), []);
+
+  const localizedRecipientRelations = useMemo(
+    () =>
+      RECIPIENT_RELATIONS.map((r) => ({
+        ...r,
+        label: t(`rel_${r.id}_label`),
+        hint: t(`rel_${r.id}_hint`),
+      })),
+    [t],
+  );
+  const localizedGenderOptions = useMemo(
+    () =>
+      GENDER_OPTIONS.map((g) => ({
+        ...g,
+        label: t(`gen_${g.id}_label`),
+        hint: t(`gen_${g.id}_hint`),
+      })),
+    [t],
+  );
+  const localizedGroupKindOptions = useMemo(
+    () =>
+      GROUP_KIND_OPTIONS.map((g) => ({
+        ...g,
+        label: t(`grp_${g.id}_label`),
+        hint: t(`grp_${g.id}_hint`),
+      })),
+    [t],
+  );
 
   const gender = useMemo(
     () => (recipientId ? recipientIdToGender(recipientId) : null),
@@ -693,6 +924,22 @@ export default function App() {
     return budgetUsd / safeGroupSize;
   }, [budgetUnlimited, budgetUsd, isGroupRecipient, safeGroupSize]);
 
+  /** Per-recipient floor in USD (same units as `recommendationBudgetUsd`). */
+  const recommendationMinBudgetUsd = useMemo(() => {
+    if (budgetUnlimited || !minimumBudgetEnabled) return 0;
+    const rate = 1 / (usdToCurrency(1, currency) || 1);
+    const minUsd = budgetMinSlider * rate;
+    if (!isGroupRecipient) return minUsd;
+    return minUsd / safeGroupSize;
+  }, [
+    budgetUnlimited,
+    minimumBudgetEnabled,
+    budgetMinSlider,
+    currency,
+    isGroupRecipient,
+    safeGroupSize,
+  ]);
+
   const effectiveBudgetUsd = useMemo(
     () => (budgetUnlimited ? Infinity : recommendationBudgetUsd),
     [budgetUnlimited, recommendationBudgetUsd],
@@ -725,6 +972,20 @@ export default function App() {
     return (budgetInCurrency / maxDisplay) * 100;
   }, [budgetUnlimited, budgetInCurrency, maxDisplay]);
 
+  const minSliderPct = useMemo(() => {
+    if (budgetUnlimited || !minimumBudgetEnabled || budgetInCurrency <= 0) {
+      return 0;
+    }
+    return (
+      (Math.min(budgetMinSlider, budgetInCurrency) / budgetInCurrency) * 100
+    );
+  }, [
+    budgetUnlimited,
+    minimumBudgetEnabled,
+    budgetMinSlider,
+    budgetInCurrency,
+  ]);
+
   const hasPassions = selectedHobbyIds.length > 0 || customHobbies.length > 0;
 
   const giftPickContext = useMemo(
@@ -741,6 +1002,11 @@ export default function App() {
       return next;
     });
   }, [budgetUnlimited, maxDisplay]);
+
+  useEffect(() => {
+    if (budgetUnlimited) return;
+    setBudgetMinSlider((m) => Math.min(m, budgetInCurrency));
+  }, [budgetUnlimited, budgetInCurrency]);
 
   useEffect(() => {
     return () => {
@@ -783,6 +1049,8 @@ export default function App() {
       setBudgetUnlimited(false);
       return;
     }
+    setBudgetMinSlider(0);
+    setMinimumBudgetEnabled(false);
     cancelBudgetRangeAnimation();
     const from = budgetSlider;
     const to = maxDisplay;
@@ -867,7 +1135,12 @@ export default function App() {
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
     const blockedNames = new Set(
-      dislikedEntries.map((e) => normalizeGiftName(e?.gift?.selectedProduct?.name)),
+      dislikedEntries
+        .map((e) => normalizeGiftName(e?.gift?.selectedProduct?.name))
+        .filter(
+          (n) =>
+            n && (n.length >= 6 || n.split(/\s+/).filter(Boolean).length >= 2),
+        ),
     );
     const applyDislikeExclusions = (recIn) => {
       if (!recIn?.gifts?.length || blockedNames.size === 0) return recIn;
@@ -875,6 +1148,7 @@ export default function App() {
         const name = normalizeGiftName(g?.selectedProduct?.name);
         return !name || !blockedNames.has(name);
       });
+      if (kept.length === 0) return recIn;
       return { ...recIn, gifts: kept };
     };
 
@@ -885,31 +1159,57 @@ export default function App() {
 
     let rec = null;
 
+    const groqParams = {
+      hobbyTitles,
+      customLabels: customHobbies,
+      excludedProductNames: [...blockedNames],
+      gender,
+      budgetUSD: recommendationBudgetUsd,
+      minBudgetUSD: recommendationMinBudgetUsd,
+      wantDIY: giftPref === "diy",
+      giftPreference: giftPref,
+      budgetUnlimited,
+      selectedHobbyIds,
+      recipientId,
+      recipientAgeRange: String(recipientAgeYears),
+      recipientGroupSize: isGroupRecipient ? safeGroupSize : null,
+    };
+
     if (groqReady) {
+      let ai = null;
       try {
-        const ai = await generateGiftIdeasWithGroq({
-          hobbyTitles,
-          customLabels: customHobbies,
-          excludedProductNames: [...blockedNames],
-          gender,
-          budgetUSD: recommendationBudgetUsd,
-          wantDIY: giftPref === "diy",
-          giftPreference: giftPref,
-          budgetUnlimited,
-          selectedHobbyIds,
-          recipientId,
-          recipientAgeRange: String(recipientAgeYears),
-          recipientGroupSize: isGroupRecipient ? safeGroupSize : null,
+        ai = await generateGiftIdeasWithGroq({
+          ...groqParams,
+          relaxedCustom: false,
         });
-        if (ai?.gifts?.length) {
-          rec = applyDislikeExclusions({
-            gifts: ai.gifts,
-            mode: "in",
-            source: "groq",
-          });
-        }
       } catch {
-        /* fall through to catalog */
+        /* fall through */
+      }
+      const lowYield =
+        !ai?.gifts?.length ||
+        (customHobbies.length > 0 && ai.gifts.length < 12);
+      if (lowYield) {
+        try {
+          const ai2 = await generateGiftIdeasWithGroq({
+            ...groqParams,
+            relaxedCustom: true,
+          });
+          if (
+            ai2?.gifts?.length &&
+            (!ai?.gifts?.length || ai2.gifts.length >= ai.gifts.length)
+          ) {
+            ai = ai2;
+          }
+        } catch {
+          /* keep first ai if any */
+        }
+      }
+      if (ai?.gifts?.length) {
+        rec = applyDislikeExclusions({
+          gifts: ai.gifts,
+          mode: "in",
+          source: "groq",
+        });
       }
     }
 
@@ -919,6 +1219,7 @@ export default function App() {
         customLabels: customHobbies,
         gender,
         budgetUSD: recommendationBudgetUsd,
+        minBudgetUSD: recommendationMinBudgetUsd,
         wantDIY: giftPref === "diy",
         giftPreference: giftPref,
         budgetUnlimited,
@@ -976,14 +1277,20 @@ export default function App() {
 
     const rec = await fetchRecommendationsCore();
     const stamped = stampGiftIdsForResult(rec);
-    const priced = groqReady
+    let priced = groqReady
       ? await enrichResultWithRetailPriceEstimates(
           stamped,
           recommendationBudgetUsd,
           budgetUnlimited,
           giftPickContext,
+          recommendationMinBudgetUsd,
         )
       : stamped;
+    priced = dropGiftsBelowMinBudget(
+      priced,
+      recommendationMinBudgetUsd,
+      budgetUnlimited,
+    );
     setResult(priced);
     if (giftPref === "diy") {
       setDiyTutorialIds((prev) =>
@@ -1004,14 +1311,20 @@ export default function App() {
     try {
       const rec = await fetchRecommendationsCore();
       const stamped = stampGiftIdsForResult(rec);
-      const priced = groqReady
+      let priced = groqReady
         ? await enrichResultWithRetailPriceEstimates(
             stamped,
             recommendationBudgetUsd,
             budgetUnlimited,
             giftPickContext,
+            recommendationMinBudgetUsd,
           )
         : stamped;
+      priced = dropGiftsBelowMinBudget(
+        priced,
+        recommendationMinBudgetUsd,
+        budgetUnlimited,
+      );
       setResult(priced);
       if (giftPref === "diy") {
         setDiyTutorialIds((prev) =>
@@ -1167,6 +1480,8 @@ export default function App() {
     setCustomInput("");
     setCountryCode("US");
     setBudgetSlider(75);
+    setBudgetMinSlider(0);
+    setMinimumBudgetEnabled(false);
     setCurrency("USD");
     setBudgetUnlimited(false);
     setResult(null);
@@ -1191,13 +1506,13 @@ export default function App() {
   }
 
   function addCustomHobby() {
-    const t = customInput.trim();
-    if (!t) return;
-    if (customHobbies.some((x) => x.toLowerCase() === t.toLowerCase())) {
+    const text = customInput.trim();
+    if (!text) return;
+    if (customHobbies.some((x) => x.toLowerCase() === text.toLowerCase())) {
       setCustomInput("");
       return;
     }
-    setCustomHobbies((prev) => [...prev, t]);
+    setCustomHobbies((prev) => [...prev, text]);
     setCustomInput("");
   }
 
@@ -1211,12 +1526,25 @@ export default function App() {
     return hobbies.filter((h) => !h.forGender || h.forGender === g);
   }, [gender]);
 
+  const localizedHobbies = useMemo(
+    () =>
+      visibleHobbies.map((h) => {
+        const loc = hobbyTitleSubtitle(locale, h.id);
+        return { ...h, title: loc.title, subtitle: loc.subtitle };
+      }),
+    [visibleHobbies, locale],
+  );
+
   const selectedHobbyLabels = useMemo(
     () =>
       selectedHobbyIds
-        .map((id) => hobbies.find((h) => h.id === id)?.title)
+        .map((id) => {
+          const h = hobbies.find((x) => x.id === id);
+          if (!h) return null;
+          return hobbyTitleSubtitle(locale, id).title;
+        })
         .filter(Boolean),
-    [selectedHobbyIds],
+    [selectedHobbyIds, locale],
   );
 
   const chosenHobbyFilterOptions = useMemo(() => {
@@ -1224,7 +1552,11 @@ export default function App() {
     const options = catalogIds
       .map((id) => hobbies.find((h) => h.id === id))
       .filter(Boolean)
-      .map((h) => ({ id: h.id, title: h.title, emoji: h.emoji }));
+      .map((h) => ({
+        id: h.id,
+        title: hobbyTitleSubtitle(locale, h.id).title,
+        emoji: h.emoji,
+      }));
 
     for (const label of customHobbies) {
       options.push({
@@ -1234,7 +1566,7 @@ export default function App() {
       });
     }
     return options;
-  }, [selectedHobbyIds, customHobbies]);
+  }, [selectedHobbyIds, customHobbies, locale]);
 
   const visibleShortlistGifts = useMemo(() => {
     if (!result?.gifts?.length) return [];
@@ -1257,19 +1589,19 @@ export default function App() {
       String(t || "")
         .toLowerCase()
         .replace(/(?:ing|ers|ies|es|s)$/i, "");
+    /** Ranking / “closest” suggestions only — not used as a loose include-all gate. */
     const customScoreForGift = (g) => {
       if (customNeedle == null) return 0;
       const hay = giftSearchTextForHobbyFilter(g);
       const hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
       let score = 0;
-      if (inferredCustomIds.includes(g._sourceHobbyId)) score += 8;
-      if (hay.includes(customNeedle)) score += 10;
+      if (hay.includes(customNeedle)) score += 20;
       if (customTokens.length > 0) {
         for (const tok of customTokens) {
-          if (hay.includes(tok)) score += 4;
+          if (hay.includes(tok)) score += 8;
           const tokStem = stemToken(tok);
           if (!tokStem) continue;
-          if (hayWords.some((w) => stemToken(w) === tokStem)) score += 3;
+          if (hayWords.some((w) => stemToken(w) === tokStem)) score += 5;
           if (
             hayWords.some(
               (w) =>
@@ -1278,20 +1610,29 @@ export default function App() {
                 w.includes(tokStem),
             )
           ) {
-            score += 2;
+            score += 3;
           }
         }
+      }
+      if (
+        inferredCustomIds.includes(g._sourceHobbyId) &&
+        !selectedHobbyIds.includes(g._sourceHobbyId)
+      ) {
+        score += 6;
       }
       return score;
     };
 
     const filtered = available.filter((g) => {
       if (activeHobbyFilterId == null) return true;
-      if (g._sourceHobbyId === activeHobbyFilterId) return true;
-      if (customNeedle != null) {
-        return customScoreForGift(g) > 0;
+      if (customFilterLabel != null) {
+        return giftMatchesCustomHobbyFilter(
+          g,
+          customFilterLabel,
+          selectedHobbyIds,
+        );
       }
-      return false;
+      return giftMatchesPresetHobbyFilter(g, activeHobbyFilterId);
     });
     if (customNeedle != null && filtered.length === 0) {
       const closest = available
@@ -1310,8 +1651,8 @@ export default function App() {
     result,
     dislikedIds,
     activeHobbyFilterId,
-    selectedHobbyIds.length,
-    customHobbies.length,
+    selectedHobbyIds,
+    customHobbies,
   ]);
 
   const showCustomOnlyFallbackBanner = useMemo(() => {
@@ -1321,42 +1662,17 @@ export default function App() {
     if (!label) return false;
     const available = result.gifts.filter((g) => !dislikedIds.includes(g.id));
     if (available.length === 0) return false;
-    const inferred = inferHobbyIdsFromCustomLabels([label]);
-    const needle = label.toLowerCase();
-    const tokens = needle
-      .split(/[^a-z0-9+]+/i)
-      .map((t) => t.trim())
-      .filter((t) => t.length >= 3);
-    const stemToken = (t) =>
-      String(t || "")
-        .toLowerCase()
-        .replace(/(?:ing|ers|ies|es|s)$/i, "");
-    const hasMatch = available.some((g) => {
-      if (inferred.includes(g._sourceHobbyId)) return true;
-      const hay = giftSearchTextForHobbyFilter(g);
-      if (hay.includes(needle)) return true;
-      const hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
-      return tokens.some((tok) => {
-        if (hay.includes(tok)) return true;
-        const tokStem = stemToken(tok);
-        if (!tokStem) return false;
-        return hayWords.some(
-          (w) =>
-            stemToken(w) === tokStem ||
-            w.startsWith(tokStem) ||
-            tokStem.startsWith(w) ||
-            w.includes(tokStem),
-        );
-      });
-    });
+    const hasMatch = available.some((g) =>
+      giftMatchesCustomHobbyFilter(g, label, selectedHobbyIds),
+    );
     if (hasMatch) return false;
     return visibleShortlistGifts.length > 0;
   }, [
     result,
     dislikedIds,
     activeHobbyFilterId,
-    selectedHobbyIds.length,
-    customHobbies.length,
+    selectedHobbyIds,
+    customHobbies,
     visibleShortlistGifts.length,
   ]);
 
@@ -1366,28 +1682,26 @@ export default function App() {
 
     const available = result.gifts.filter((g) => !dislikedIds.includes(g.id));
     if (available.length === 0) {
-      return "You have disliked all current gifts. Remove a dislike or click More ideas.";
+      return t("disliked_all");
     }
 
-    const inferred = inferHobbyIdsFromCustomLabels([label]);
-    const needle = label.toLowerCase();
-    const tokens = needle
-      .split(/[^a-z0-9+]+/i)
-      .map((t) => t.trim())
-      .filter((t) => t.length >= 3);
-    const hasMatch = available.some((g) => {
-      if (inferred.includes(g._sourceHobbyId)) return true;
-      const hay = giftSearchTextForHobbyFilter(g);
-      if (hay.includes(needle)) return true;
-      return tokens.some((tok) => hay.includes(tok));
-    });
+    const hasMatch = available.some((g) =>
+      giftMatchesCustomHobbyFilter(g, label, selectedHobbyIds),
+    );
     if (hasMatch) return null;
 
     if (!budgetUnlimited && result.mode === "stretch") {
-      return `No strong matches for "${label}" at this budget yet. Try increasing budget or click More ideas.`;
+      return t("custom_no_match_stretch", { label });
     }
-    return `No current gifts strongly match "${label}" yet. Try broader wording for this hobby or click More ideas for a fresh Groq set.`;
-  }, [activeHobbyFilterId, result, dislikedIds, budgetUnlimited]);
+    return t("custom_no_match_default", { label });
+  }, [
+    activeHobbyFilterId,
+    result,
+    dislikedIds,
+    budgetUnlimited,
+    selectedHobbyIds,
+    t,
+  ]);
 
   const dislikedGiftRows = dislikedEntries;
 
@@ -1407,7 +1721,20 @@ export default function App() {
     return DIY_TUTORIALS.slice(0, 3);
   }, [diyTutorialIds]);
 
-  const recapParts = [...selectedHobbyLabels, ...customHobbies];
+  const recapParts = useMemo(
+    () => [...selectedHobbyLabels, ...customHobbies],
+    [selectedHobbyLabels, customHobbies],
+  );
+
+  const recapHobbiesFormatted = useMemo(() => {
+    if (recapParts.length === 0) return "";
+    const parts =
+      locale === "en" ? recapParts.map((p) => p.toLowerCase()) : recapParts;
+    return new Intl.ListFormat(locale === "he" ? "he" : "en", {
+      style: "long",
+      type: "conjunction",
+    }).format(parts);
+  }, [recapParts, locale]);
 
   function displayProduct(gift) {
     const vid = variantByGiftId[gift.id];
@@ -1425,6 +1752,7 @@ export default function App() {
       p.id,
       effectiveBudgetUsd,
       giftPickContext,
+      recommendationMinBudgetUsd,
     );
     setVariantByGiftId((prev) => ({ ...prev, [gift.id]: next.id }));
   }
@@ -1450,6 +1778,7 @@ export default function App() {
         text,
         effectiveBudgetUsd,
         giftPickContext,
+        recommendationMinBudgetUsd,
       );
       setVariantByGiftId((prev) => ({ ...prev, [gift.id]: picked.id }));
     };
@@ -1461,6 +1790,7 @@ export default function App() {
         budgetUSD: budgetUnlimited ? Infinity : recommendationBudgetUsd,
         categoryTitle: gift.categoryTitle,
         budgetUnlimited,
+        minBudgetUSD: recommendationMinBudgetUsd,
       });
       if (ai) {
         const match = gift.variants.find((v) => v.id === ai.chosenId);
@@ -1476,8 +1806,7 @@ export default function App() {
           applyLocal();
           setRefineErrorByGiftId((prev) => ({
             ...prev,
-            [gift.id]:
-              "That response didn’t match a product on this card; used on-device matching instead.",
+            [gift.id]: t("refine_err_no_match"),
           }));
         }
       } else {
@@ -1488,7 +1817,7 @@ export default function App() {
       const detail = err?.message ? ` (${err.message})` : "";
       setRefineErrorByGiftId((prev) => ({
         ...prev,
-        [gift.id]: `Refine didn’t complete${detail} — used on-device matching instead.`,
+        [gift.id]: t("refine_err_failed", { detail }),
       }));
     } finally {
       setRefiningId(null);
@@ -1539,8 +1868,7 @@ export default function App() {
         } else {
           setWantThisErrorByGiftId((prev) => ({
             ...prev,
-            [gift.id]:
-              "Pop-up blocked — allow pop-ups for this site, then try again.",
+            [gift.id]: t("popup_blocked"),
           }));
         }
       }
@@ -1550,7 +1878,11 @@ export default function App() {
   }
 
   return (
-    <div className="Shell" id="top">
+    <div
+      className="Shell"
+      id="top"
+      dir={locale === "he" ? "rtl" : "ltr"}
+    >
       <div className="Shell__glow" aria-hidden />
       <header className="Header">
         <button
@@ -1559,38 +1891,116 @@ export default function App() {
           onClick={() =>
             pageMode === "privacy" ? openGiftPickerHome() : restart()
           }
-          aria-label="Start over"
+          aria-label={t("start_over_logo")}
         >
           <img src={GiftedLight} alt="GiftedIcon" className="GiftedIcon" />
           <div className="GiftedText">
             <img src={GiftedLogo} alt="Gifted" />
-            <h3>Gifting, made effortless</h3>
+            <h3>{t("tagline")}</h3>
           </div>
         </button>
         <div className="Header__actions">
-          {pageMode === "privacy" ? (
-            <button
-              type="button"
-              className="Btn Btn--ghost"
-              onClick={openGiftPickerHome}
-            >
-              Back to app
-            </button>
-          ) : (
-            step !== "who" &&
-            step !== "thinking" && (
-              <button type="button" className="Btn Btn--ghost" onClick={restart}>
-                Start over
+          <div className="Header__actionsRow">
+            {pageMode === "privacy" ? (
+              <button
+                type="button"
+                className="Btn Btn--ghost"
+                onClick={openGiftPickerHome}
+              >
+                {t("back_to_app")}
               </button>
-            )
-          )}
+            ) : (
+              step !== "who" &&
+              step !== "thinking" && (
+                <button
+                  type="button"
+                  className="Btn Btn--ghost"
+                  onClick={restart}
+                >
+                  {t("start_over")}
+                </button>
+              )
+            )}
+          </div>
+
+          <div className="LangSelect" ref={langSelectRef}>
+            <button
+              id="lang-select-trigger"
+              type="button"
+              className={`LangSelect__trigger${langMenuOpen ? " LangSelect__trigger--open" : ""}`}
+              aria-expanded={langMenuOpen}
+              aria-haspopup="listbox"
+              aria-controls="lang-select-menu"
+              onClick={() => setLangMenuOpen((open) => !open)}
+            >
+              <span className="LangSelect__triggerLabel">
+                {locale === "en" ? t("lang_en") : t("lang_he")}
+              </span>
+              <span className="LangSelect__caret" aria-hidden />
+            </button>
+            {langMenuOpen && (
+              <ul
+                id="lang-select-menu"
+                className="LangSelect__menu"
+                role="listbox"
+                aria-labelledby="lang-select-trigger"
+              >
+                <li className="LangSelect__menuItem" role="none">
+                  <button
+                    type="button"
+                    className={`LangSelect__option${locale === "en" ? " LangSelect__option--active" : ""}`}
+                    role="option"
+                    aria-selected={locale === "en"}
+                    onClick={() => {
+                      setLocale("en");
+                      setLangMenuOpen(false);
+                    }}
+                  >
+                    <img
+                      className="LangSelect__optionFlag"
+                      src={langEnFlag}
+                      alt=""
+                      width={28}
+                      height={28}
+                    />
+                    <span>{t("lang_en")}</span>
+                  </button>
+                </li>
+                <li className="LangSelect__menuItem" role="none">
+                  <button
+                    type="button"
+                    className={`LangSelect__option${locale === "he" ? " LangSelect__option--active" : ""}`}
+                    role="option"
+                    aria-selected={locale === "he"}
+                    onClick={() => {
+                      setLocale("he");
+                      setLangMenuOpen(false);
+                    }}
+                  >
+                    <img
+                      className="LangSelect__optionFlag"
+                      src={langHeFlag}
+                      alt=""
+                      width={28}
+                      height={28}
+                    />
+                    <span>{t("lang_he")}</span>
+                  </button>
+                </li>
+              </ul>
+            )}
+          </div>
 
           {pageMode !== "privacy" &&
             step === "results" &&
             dislikedGiftRows.length > 0 && (
-              <div className="DislikesManager" role="region" aria-label="Manage dislikes">
+              <div
+                className="DislikesManager"
+                role="region"
+                aria-label={t("manage_dislikes")}
+              >
                 <div className="DislikesManager__summary">
-                  Manage dislikes ({dislikedGiftRows.length})
+                  {t("manage_dislikes")} ({dislikedGiftRows.length})
                 </div>
                 <ul className="DislikesManager__list">
                   {dislikedGiftRows.map((entry) => {
@@ -1603,7 +2013,9 @@ export default function App() {
                     return (
                       <li key={entry.key} className="DislikesManager__item">
                         <div className="DislikesManager__meta">
-                          <span className="DislikesManager__name">{product.name}</span>
+                          <span className="DislikesManager__name">
+                            {product.name}
+                          </span>
                           <span className="DislikesManager__price">
                             {formatApproxGiftPrice(priceLocal, currency)}
                           </span>
@@ -1620,7 +2032,7 @@ export default function App() {
                             );
                           }}
                         >
-                          Remove dislike
+                          {t("remove_dislike")}
                         </button>
                       </li>
                     );
@@ -1637,41 +2049,24 @@ export default function App() {
             className="Panel fade-in PrivacyPage"
             aria-labelledby="privacy-title"
           >
-            <p className="Eyebrow">Privacy policy</p>
+            <p className="Eyebrow">{t("privacy_eyebrow")}</p>
             <h2 id="privacy-title" className="Panel__title">
-              Privacy Policy
+              {t("privacy_title")}
             </h2>
-            <p className="Panel__lead">
-              Gifted is designed to suggest gift ideas from the options and
-              preferences you choose in the app.
-            </p>
+            <p className="Panel__lead">{t("privacy_lead")}</p>
             <div className="PrivacyPage__content">
-              <h3>What data is used</h3>
+              <h3>{t("privacy_h_data")}</h3>
+              <p>{t("privacy_p_data")}</p>
+              <h3>{t("privacy_h_use")}</h3>
+              <p>{t("privacy_p_use")}</p>
+              <h3>{t("privacy_h_external")}</h3>
+              <p>{t("privacy_p_external")}</p>
+              <h3>{t("privacy_h_retail")}</h3>
+              <p>{t("privacy_p_retail")}</p>
+              <h3>{t("privacy_h_contact")}</h3>
               <p>
-                We use the details you enter during this session, such as
-                recipient type, age, interests, budget, and selected options, to
-                generate recommendations.
-              </p>
-              <h3>How it is used</h3>
-              <p>
-                This data is used only to power gift suggestions and related
-                ranking or refinement features while you are using the app.
-              </p>
-              <h3>External services</h3>
-              <p>
-                Some features may call third-party services (for example AI or
-                image providers). When those features are used, request data
-                needed for that feature may be sent to those services.
-              </p>
-              <h3>Retailer links</h3>
-              <p>
-                Retailer buttons open external shopping/search pages. Those
-                websites have their own privacy policies and terms.
-              </p>
-              <h3>Contact</h3>
-              <p>
-                For privacy questions, contact{" "}
-                <a href="mailto:TalVilozny@gmail.com">TalVilozny@gmail.com</a>.
+                {t("privacy_contact_lead")}{" "}
+                <a href="mailto:TalVilozny@gmail.com">TalVilozny@gmail.com</a>
               </p>
             </div>
           </section>
@@ -1679,14 +2074,11 @@ export default function App() {
           <>
             {step === "who" && (
               <section className="Panel fade-in" aria-labelledby="who-title">
-                <p className="Eyebrow">Step 1</p>
+                <p className="Eyebrow">{t("step1")}</p>
                 <h2 id="who-title" className="Panel__title">
-                  Picking a gift for a person or a group
+                  {t("who_title")}
                 </h2>
-                <p className="Panel__lead">
-                  Choose whether you&rsquo;re gifting one person or a group.
-                  Then we&rsquo;ll ask for age so recommendations fit.
-                </p>
+                <p className="Panel__lead">{t("who_lead")}</p>
                 {audienceMode == null && (
                   <div className="ChoiceRow ChoiceRow--relations">
                     <button
@@ -1698,10 +2090,10 @@ export default function App() {
                         🎯
                       </span>
                       <span className="ChoiceCard__label">
-                        Picking a gift for a person
+                        {t("who_person")}
                       </span>
                       <span className="ChoiceCard__hint">
-                        Choose a relative or gender
+                        {t("who_person_hint")}
                       </span>
                     </button>
                     <button
@@ -1713,10 +2105,10 @@ export default function App() {
                         👥
                       </span>
                       <span className="ChoiceCard__label">
-                        Picking a gift for a group
+                        {t("who_group")}
                       </span>
                       <span className="ChoiceCard__hint">
-                        Pick the group and composition
+                        {t("who_group_hint")}
                       </span>
                     </button>
                   </div>
@@ -1724,9 +2116,11 @@ export default function App() {
 
                 {audienceMode === "person" && (
                   <>
-                    <p className="FieldLabel WhoSection__label">Relationship</p>
+                    <p className="FieldLabel WhoSection__label">
+                      {t("relationship")}
+                    </p>
                     <div className="ChoiceRow ChoiceRow--relations">
-                      {RECIPIENT_RELATIONS.map((r) => (
+                      {localizedRecipientRelations.map((r) => (
                         <button
                           key={r.id}
                           type="button"
@@ -1742,10 +2136,10 @@ export default function App() {
                       ))}
                     </div>
                     <p className="FieldLabel WhoSection__label WhoSection__label--spaced">
-                      Or by gender
+                      {t("or_by_gender")}
                     </p>
                     <div className="ChoiceRow ChoiceRow--gender">
-                      {GENDER_OPTIONS.map((g) => (
+                      {localizedGenderOptions.map((g) => (
                         <button
                           key={g.id}
                           type="button"
@@ -1769,7 +2163,7 @@ export default function App() {
                           setRecipientId(null);
                         }}
                       >
-                        Back
+                        {t("back")}
                       </button>
                     </div>
                   </>
@@ -1777,9 +2171,11 @@ export default function App() {
 
                 {audienceMode === "group" && (
                   <>
-                    <p className="FieldLabel WhoSection__label">Which group?</p>
+                    <p className="FieldLabel WhoSection__label">
+                      {t("which_group")}
+                    </p>
                     <div className="ChoiceRow ChoiceRow--relations">
-                      {GROUP_KIND_OPTIONS.map((g) => (
+                      {localizedGroupKindOptions.map((g) => (
                         <button
                           key={g.id}
                           type="button"
@@ -1797,7 +2193,7 @@ export default function App() {
                     </div>
 
                     <p className="FieldLabel WhoSection__label WhoSection__label--spaced">
-                      Group composition
+                      {t("group_composition")}
                     </p>
                     <div className="ChoiceRow ChoiceRow--gender">
                       <button
@@ -1809,9 +2205,11 @@ export default function App() {
                         <span className="ChoiceCard__emoji" aria-hidden>
                           ♂️
                         </span>
-                        <span className="ChoiceCard__label">All male</span>
+                        <span className="ChoiceCard__label">
+                          {t("all_male")}
+                        </span>
                         <span className="ChoiceCard__hint">
-                          Same-gender group
+                          {t("same_gender_group")}
                         </span>
                       </button>
                       <button
@@ -1823,9 +2221,11 @@ export default function App() {
                         <span className="ChoiceCard__emoji" aria-hidden>
                           ♀️
                         </span>
-                        <span className="ChoiceCard__label">All female</span>
+                        <span className="ChoiceCard__label">
+                          {t("all_female")}
+                        </span>
                         <span className="ChoiceCard__hint">
-                          Same-gender group
+                          {t("same_gender_group")}
                         </span>
                       </button>
                       <button
@@ -1837,13 +2237,17 @@ export default function App() {
                         <span className="ChoiceCard__emoji" aria-hidden>
                           ⚧
                         </span>
-                        <span className="ChoiceCard__label">Mixed group</span>
-                        <span className="ChoiceCard__hint">Men and women</span>
+                        <span className="ChoiceCard__label">
+                          {t("mixed_group")}
+                        </span>
+                        <span className="ChoiceCard__hint">
+                          {t("men_and_women")}
+                        </span>
                       </button>
                     </div>
                     <div className="GroupSizeRow">
                       <label className="FieldLabel" htmlFor="group-size">
-                        How many people are in the group?
+                        {t("group_size_q")}
                       </label>
                       <input
                         id="group-size"
@@ -1870,23 +2274,23 @@ export default function App() {
                     </div>
                     {(groupKindId || groupGenderMode) && (
                       <p className="Banner Banner--info" role="status">
-                        Selected:{" "}
+                        {t("selected_prefix")}{" "}
                         <strong>
                           {groupKindId
-                            ? GROUP_KIND_OPTIONS.find(
+                            ? localizedGroupKindOptions.find(
                                 (x) => x.id === groupKindId,
                               )?.label
-                            : "Choose group"}
+                            : t("choose_group")}
                         </strong>{" "}
                         ·{" "}
                         <strong>
                           {groupGenderMode === "male"
-                            ? "All male"
+                            ? t("all_male")
                             : groupGenderMode === "female"
-                              ? "All female"
+                              ? t("all_female")
                               : groupGenderMode === "mixed"
-                                ? "Mixed group"
-                                : "Choose composition"}
+                                ? t("mixed_group")
+                                : t("choose_composition")}
                         </strong>
                       </p>
                     )}
@@ -1902,7 +2306,7 @@ export default function App() {
                           setGroupGenderMode(null);
                         }}
                       >
-                        Back
+                        {t("back")}
                       </button>
                       <button
                         type="button"
@@ -1915,7 +2319,7 @@ export default function App() {
                         }
                         onClick={() => pickGroup(groupKindId, groupGenderMode)}
                       >
-                        Continue
+                        {t("continue")}
                       </button>
                     </div>
                   </>
@@ -1925,24 +2329,23 @@ export default function App() {
 
             {step === "age" && (
               <section className="Panel fade-in" aria-labelledby="age-title">
-                <p className="Eyebrow">Step 2</p>
+                <p className="Eyebrow">{t("step2")}</p>
                 <h2 id="age-title" className="Panel__title">
-                  How old are they?
+                  {t("age_title")}
                 </h2>
                 <p className="Panel__lead">
-                  Set their age in years — Gifted uses it for tone and gift
-                  ideas.
+                  {t("age_lead_base")}
                   {recipientId === "mom" || recipientId === "dad"
-                    ? " Parents: ages 20–100."
+                    ? ` ${t("age_lead_parents")}`
                     : recipientId === "boyfriend" ||
                         recipientId === "girlfriend"
-                      ? " Partners: ages 15–100."
+                      ? ` ${t("age_lead_partners")}`
                       : recipientId === "kid"
-                        ? " Kids: ages 0–17."
+                        ? ` ${t("age_lead_kids")}`
                         : typeof recipientId === "string" &&
                             recipientId.startsWith("group-")
-                          ? " Group members: ages 0–100."
-                          : " Ages 0–100."}
+                          ? ` ${t("age_lead_group")}`
+                          : ` ${t("age_lead_default")}`}
                 </p>
                 <div className="AgeSlider">
                   <div
@@ -1959,13 +2362,26 @@ export default function App() {
                         )
                       }
                       disabled={recipientAgeYears <= ageLimits.min}
-                      aria-label="Decrease age by 1"
+                      aria-label={t("age_decrease")}
                     >
                       ‹
                     </button>
                     <span className="AgeSlider__label">
-                      {recipientAgeYears}{" "}
-                      <span className="AgeSlider__years">years old</span>
+                      {locale === "he" ? (
+                        <>
+                          <span className="AgeSlider__years">
+                            {t("age_label_word")}
+                          </span>{" "}
+                          {recipientAgeYears}
+                        </>
+                      ) : (
+                        <>
+                          {recipientAgeYears}{" "}
+                          <span className="AgeSlider__years">
+                            {t("years_old")}
+                          </span>
+                        </>
+                      )}
                     </span>
                     <button
                       type="button"
@@ -1976,7 +2392,7 @@ export default function App() {
                         )
                       }
                       disabled={recipientAgeYears >= ageLimits.max}
-                      aria-label="Increase age by 1"
+                      aria-label={t("age_increase")}
                     >
                       ›
                     </button>
@@ -1988,6 +2404,7 @@ export default function App() {
                     <input
                       type="range"
                       className="AgeSlider__range"
+                      dir={locale === "he" ? "rtl" : "ltr"}
                       min={ageLimits.min}
                       max={ageLimits.max}
                       step={1}
@@ -1998,7 +2415,9 @@ export default function App() {
                       aria-valuemin={ageLimits.min}
                       aria-valuemax={ageLimits.max}
                       aria-valuenow={recipientAgeYears}
-                      aria-valuetext={`${recipientAgeYears} years old`}
+                      aria-valuetext={t("age_readout_aria", {
+                        age: recipientAgeYears,
+                      })}
                       aria-labelledby="age-title"
                       aria-describedby="age-slider-readout"
                     />
@@ -2014,14 +2433,14 @@ export default function App() {
                     className="Btn Btn--ghost"
                     onClick={() => setStep("who")}
                   >
-                    Back
+                    {t("back")}
                   </button>
                   <button
                     type="button"
                     className="Btn Btn--primary"
                     onClick={continueFromAge}
                   >
-                    Continue
+                    {t("continue")}
                   </button>
                 </div>
               </section>
@@ -2032,20 +2451,21 @@ export default function App() {
                 className="Panel fade-in"
                 aria-labelledby="passion-title"
               >
-                <p className="Eyebrow">Step 3</p>
+                <p className="Eyebrow">{t("step3")}</p>
                 <h2 id="passion-title" className="Panel__title">
-                  What makes them light up?
+                  {t("passion_title")}
                 </h2>
-                <p className="Panel__lead">
-                  Select several hobbies, or add your own — we blend ideas
-                  across everything you pick.
-                </p>
+                <p className="Panel__lead">{t("passion_lead")}</p>
 
                 {hasPassions && (
-                  <div className="ChipStrip" aria-label="Selected interests">
+                  <div
+                    className="ChipStrip"
+                    aria-label={t("selected_interests")}
+                  >
                     {selectedHobbyIds.map((id) => {
                       const h = hobbies.find((x) => x.id === id);
                       if (!h) return null;
+                      const loc = hobbyTitleSubtitle(locale, id);
                       return (
                         <button
                           key={id}
@@ -2057,7 +2477,7 @@ export default function App() {
                             )
                           }
                         >
-                          {h.emoji} {h.title}
+                          {h.emoji} {loc.title}
                           <span className="Chip__x" aria-hidden>
                             ×
                           </span>
@@ -2081,7 +2501,7 @@ export default function App() {
                 )}
 
                 <div className="HobbyGrid">
-                  {visibleHobbies.map((h) => {
+                  {localizedHobbies.map((h) => {
                     const on = selectedHobbyIds.includes(h.id);
                     return (
                       <button
@@ -2107,13 +2527,13 @@ export default function App() {
 
                 <div className="AddHobby">
                   <label className="FieldLabel" htmlFor="custom-hobby">
-                    Add a hobby
+                    {t("add_hobby")}
                   </label>
                   <div className="AddHobby__row">
                     <input
                       id="custom-hobby"
                       className="Input"
-                      placeholder="e.g. Cars, Ceramics, Chess…"
+                      placeholder={t("add_hobby_ph")}
                       value={customInput}
                       onChange={(e) => setCustomInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -2128,27 +2548,26 @@ export default function App() {
                       className="Btn Btn--secondary"
                       onClick={addCustomHobby}
                     >
-                      Add
+                      {t("add_btn")}
                     </button>
                   </div>
                   {customInput.trim() &&
                     inferHobbyIdsFromCustomLabels([customInput.trim()]).length >
                       0 && (
                       <p className="AddHobby__hint">
-                        We’ll include matching catalog picks (e.g.{" "}
-                        <strong>Cars</strong> → automotive ideas).
+                        {t("add_hobby_hint", {
+                          cars: t("add_hobby_hint_cars"),
+                        })}
                       </p>
                     )}
                 </div>
 
-                <p className="FieldLabel GiftPref__label">Gift style</p>
-                <p className="GiftPref__intro">
-                  Choose one — we’ll match ideas to how you want to give.
-                </p>
+                <p className="FieldLabel GiftPref__label">{t("gift_style")}</p>
+                <p className="GiftPref__intro">{t("gift_style_intro")}</p>
                 <div
                   className="GiftPrefGrid"
                   role="radiogroup"
-                  aria-label="Gift style"
+                  aria-label={t("gift_style_aria")}
                 >
                   <button
                     type="button"
@@ -2161,10 +2580,10 @@ export default function App() {
                       ✂️
                     </span>
                     <span className="GiftPrefCard__title">
-                      I want to make it myself
+                      {t("pref_diy_title")}
                     </span>
                     <span className="GiftPrefCard__sub">
-                      Handmade, kits, and deeply personal touches
+                      {t("pref_diy_sub")}
                     </span>
                   </button>
                   <button
@@ -2178,10 +2597,10 @@ export default function App() {
                       🎟️
                     </span>
                     <span className="GiftPrefCard__title">
-                      I want to give an experience
+                      {t("pref_exp_title")}
                     </span>
                     <span className="GiftPrefCard__sub">
-                      Tickets, classes, trips, spa days, memberships
+                      {t("pref_exp_sub")}
                     </span>
                   </button>
                   <button
@@ -2195,10 +2614,10 @@ export default function App() {
                       🎁
                     </span>
                     <span className="GiftPrefCard__title">
-                      I want to buy something premade
+                      {t("pref_pre_title")}
                     </span>
                     <span className="GiftPrefCard__sub">
-                      Finished, ready-to-wrap products
+                      {t("pref_pre_sub")}
                     </span>
                   </button>
                 </div>
@@ -2209,7 +2628,7 @@ export default function App() {
                     className="Btn Btn--ghost"
                     onClick={() => setStep("age")}
                   >
-                    Back
+                    {t("back")}
                   </button>
                   <button
                     type="button"
@@ -2217,7 +2636,7 @@ export default function App() {
                     disabled={!hasPassions || !giftPreference}
                     onClick={continueFromPassion}
                   >
-                    Continue
+                    {t("continue")}
                   </button>
                 </div>
               </section>
@@ -2225,21 +2644,21 @@ export default function App() {
 
             {step === "budget" && (
               <section className="Panel fade-in" aria-labelledby="budget-title">
-                <p className="Eyebrow">Step 4</p>
+                <p className="Eyebrow">{t("step4")}</p>
                 <h2 id="budget-title" className="Panel__title">
-                  Budget & region
+                  {t("budget_title")}
                 </h2>
                 <p className="Panel__lead">
-                  Dial in spend up to ~{BUDGET_MAX_USD.toLocaleString()} USD
-                  equivalent. For anything above that, use{" "}
-                  <strong>endless budget</strong> for uncapped ideas (luxury,
-                  travel, big tech, etc.).
+                  {t("budget_lead", {
+                    maxUsd: BUDGET_MAX_USD.toLocaleString(),
+                    endless: t("endless_word"),
+                  })}
                 </p>
 
                 <div className="FormGrid">
                   <div className="CurrencyRow">
                     <label className="FieldLabel" htmlFor="country">
-                      Shopping country
+                      {t("shopping_country")}
                     </label>
                     <select
                       id="country"
@@ -2256,7 +2675,7 @@ export default function App() {
                   </div>
                   <div className="CurrencyRow">
                     <label className="FieldLabel" htmlFor="currency">
-                      Display currency
+                      {t("display_currency")}
                     </label>
                     <select
                       id="currency"
@@ -2270,8 +2689,12 @@ export default function App() {
                         let nextVal = Math.round(usd * nextPerUsd);
                         const hi = usdToCurrency(BUDGET_MAX_USD, next);
                         nextVal = Math.min(hi, Math.max(0, nextVal));
+                        const usdMin = budgetMinSlider / prevPerUsd;
+                        let nextMin = Math.round(usdMin * nextPerUsd);
+                        nextMin = Math.min(nextVal, Math.max(0, nextMin));
                         setCurrency(next);
                         setBudgetSlider(nextVal);
+                        setBudgetMinSlider(nextMin);
                       }}
                     >
                       {CURRENCIES.map((c) => (
@@ -2293,19 +2716,21 @@ export default function App() {
                     }
                   />
                   <span>
-                    <strong>Endless budget</strong> — no cap on spend (above the
-                    ~{BUDGET_MAX_USD.toLocaleString()} USD slider max). Use this
-                    for premium or high-ticket gifts; suggestions skew toward
-                    higher-end picks.
+                    {t("endless_check", {
+                      strong: t("endless_strong"),
+                      maxUsd: BUDGET_MAX_USD.toLocaleString(),
+                    })}
                   </span>
                 </label>
 
                 <div className="SliderBlock">
                   <div className="SliderBlock__top">
-                    <span className="FieldLabel">Budget</span>
+                    <span className="FieldLabel">{t("budget_label")}</span>
                     <span className="SliderBlock__value">
                       {budgetUnlimited ? (
-                        <span className="SliderBlock__infinity">No limit</span>
+                        <span className="SliderBlock__infinity">
+                          {t("no_limit")}
+                        </span>
                       ) : (
                         formatMoney(budgetInCurrency, currency)
                       )}
@@ -2318,6 +2743,7 @@ export default function App() {
                     <input
                       type="range"
                       className="Range"
+                      dir={locale === "he" ? "rtl" : "ltr"}
                       min={budgetMinDisplay}
                       max={maxDisplay}
                       step={
@@ -2337,10 +2763,87 @@ export default function App() {
                   </div>
                 </div>
 
+                {!budgetUnlimited && (
+                  <>
+                    <label className="BudgetUnlimited">
+                      <input
+                        type="checkbox"
+                        className="BudgetUnlimited__checkbox"
+                        checked={minimumBudgetEnabled}
+                        onChange={(e) =>
+                          setMinimumBudgetEnabled(e.target.checked)
+                        }
+                      />
+                      <span>
+                        {t("min_price_check", {
+                          strong: t("min_price_strong"),
+                        })}
+                      </span>
+                    </label>
+
+                    {minimumBudgetEnabled && (
+                      <div className="SliderBlock">
+                        <div className="SliderBlock__top">
+                          <span className="FieldLabel">
+                            {t("min_gift_price")}
+                          </span>
+                          <span className="SliderBlock__value">
+                            {formatMoney(
+                              Math.min(budgetMinSlider, budgetInCurrency),
+                              currency,
+                            )}
+                          </span>
+                        </div>
+                        <div
+                          className="RangeWrap"
+                          style={{ "--pct": `${minSliderPct}%` }}
+                        >
+                          <input
+                            type="range"
+                            className="Range"
+                            dir={locale === "he" ? "rtl" : "ltr"}
+                            min={0}
+                            max={Math.max(0, budgetInCurrency)}
+                            step={
+                              currency === "ILS"
+                                ? 20
+                                : budgetInCurrency > 5000
+                                  ? 25
+                                  : 10
+                            }
+                            value={Math.min(budgetMinSlider, budgetInCurrency)}
+                            onChange={(e) =>
+                              setBudgetMinSlider(
+                                Math.min(
+                                  budgetInCurrency,
+                                  Math.max(0, Number(e.target.value)),
+                                ),
+                              )
+                            }
+                            aria-valuemin={0}
+                            aria-valuemax={budgetInCurrency}
+                            aria-valuenow={Math.min(
+                              budgetMinSlider,
+                              budgetInCurrency,
+                            )}
+                          />
+                        </div>
+                        <div className="SliderBlock__ticks">
+                          <span>{formatMoney(0, currency)}</span>
+                          <span>{formatMoney(budgetInCurrency, currency)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="BudgetInputRow">
                   <label className="FieldLabel" htmlFor="budget-amount">
-                    Exact amount (
-                    {CURRENCIES.find((c) => c.code === currency)?.symbol ?? ""})
+                    {t("exact_amount", {
+                      symbol:
+                        CURRENCIES.find((c) => c.code === currency)?.symbol ??
+                        "",
+                    })}
                   </label>
                   <input
                     id="budget-amount"
@@ -2374,37 +2877,39 @@ export default function App() {
 
                 {recapParts.length > 0 && recipientId && (
                   <p className="Recap">
-                    Gifting <strong>{recipientRecapLabel(recipientId)}</strong>
+                    {t("recap_gifting")}{" "}
+                    <strong>{recipientRecapLabel(recipientId, t)}</strong>
                     {recipientId && (
                       <>
                         {" "}
-                        (<strong>{recipientAgeYears} years old</strong>)
+                        (
+                        <strong>
+                          {t("age_recap", { age: recipientAgeYears })}
+                        </strong>
+                        )
                       </>
                     )}{" "}
-                    into{" "}
-                    <strong>
-                      {recapParts.length === 1
-                        ? recapParts[0].toLowerCase()
-                        : `${recapParts.slice(0, -1).join(", ")} and ${recapParts.at(-1)}`.toLowerCase()}
-                    </strong>
+                    {t("recap_into")} <strong>{recapHobbiesFormatted}</strong>
                     {budgetUnlimited ? (
                       <>
                         {" "}
-                        with <strong>no budget cap</strong> (luxury picks
-                        enabled).
+                        {t("recap_no_cap", {
+                          strong: t("recap_no_cap_strong"),
+                        })}
                       </>
                     ) : (
                       <>
                         {" "}
-                        around{" "}
+                        {t("recap_around")}{" "}
                         <strong>
                           {formatMoney(budgetInCurrency, currency)}
                         </strong>
                         {isGroupRecipient && (
                           <>
                             {" "}
-                            total for <strong>{safeGroupSize}</strong> people (
-                            ~
+                            {t("recap_total_for")}{" "}
+                            <strong>{safeGroupSize}</strong> {t("recap_people")}{" "}
+                            (~
                             <strong>
                               {formatMoney(
                                 usdToCurrency(
@@ -2414,7 +2919,24 @@ export default function App() {
                                 currency,
                               )}
                             </strong>{" "}
-                            each)
+                            {t("recap_each")})
+                          </>
+                        )}
+                        {minimumBudgetEnabled && budgetMinSlider > 0 && (
+                          <>
+                            {" "}
+                            {t("recap_favoring")}{" "}
+                            <strong>
+                              {formatMoney(
+                                usdToCurrency(
+                                  recommendationMinBudgetUsd,
+                                  currency,
+                                ),
+                                currency,
+                              )}
+                            </strong>
+                            {isGroupRecipient ? t("recap_per_person") : ""}{" "}
+                            {t("recap_upward")}
                           </>
                         )}
                         .
@@ -2429,7 +2951,7 @@ export default function App() {
                     className="Btn Btn--ghost"
                     onClick={() => setStep("passion")}
                   >
-                    Back
+                    {t("back")}
                   </button>
                   <button
                     type="button"
@@ -2437,7 +2959,7 @@ export default function App() {
                     disabled={!giftPreference}
                     onClick={() => void goBudget()}
                   >
-                    Find gifts
+                    {t("find_gifts")}
                   </button>
                 </div>
               </section>
@@ -2446,12 +2968,10 @@ export default function App() {
             {step === "thinking" && (
               <section className="Thinking fade-in" aria-live="polite">
                 <div className="Thinking__orb" aria-hidden />
-                <h2 className="Thinking__title">Finding the best fit…</h2>
+                <h2 className="Thinking__title">{t("thinking_title")}</h2>
                 <p className="Thinking__text">
-                  {groqReady
-                    ? "Creating personalized gift ideas and estimating typical prices and ratings"
-                    : "Scoring gifts from our catalog for your hobbies and budget"}{" "}
-                  in{" "}
+                  {groqReady ? t("thinking_groq") : t("thinking_catalog")}{" "}
+                  {t("thinking_in")}{" "}
                   {CURRENCIES.find((c) => c.code === currency)?.label ??
                     currency}
                   .
@@ -2465,11 +2985,11 @@ export default function App() {
                 aria-labelledby="results-title"
               >
                 <h2 id="results-title" className="Panel__title">
-                  Your gift ideas
+                  {t("results_title")}
                 </h2>
                 {chosenHobbyFilterOptions.length > 0 && (
                   <div className="HobbyFilter">
-                    <p className="HobbyFilter__label">Hobbies you chose</p>
+                    <p className="HobbyFilter__label">{t("hobbies_chose")}</p>
                     <div className="ChipStrip HobbyFilter__strip">
                       <button
                         type="button"
@@ -2477,7 +2997,7 @@ export default function App() {
                         aria-pressed={activeHobbyFilterId == null}
                         onClick={() => setActiveHobbyFilterId(null)}
                       >
-                        All
+                        {t("filter_all")}
                       </button>
                       {chosenHobbyFilterOptions.map((h) => (
                         <button
@@ -2500,7 +3020,7 @@ export default function App() {
                     onClick={() => void reloadSuggestions()}
                     disabled={isReloading}
                   >
-                    {isReloading ? "Loading…" : "More ideas"}
+                    {isReloading ? t("loading") : t("more_ideas")}
                   </button>
                   <button
                     type="button"
@@ -2517,11 +3037,11 @@ export default function App() {
                     disabled={likedEntries.length < 2}
                     title={
                       likedEntries.length < 2
-                        ? "Like at least two gifts to pick between them"
+                        ? t("pick_for_me_title")
                         : undefined
                     }
                   >
-                    Pick for me
+                    {t("pick_for_me")}
                   </button>
                 </div>
                 {showDiyTutorials && (
@@ -2533,11 +3053,10 @@ export default function App() {
                       id="diy-tutorials-title"
                       className="DiyTutorials__title"
                     >
-                      DIY ideas you can make without buying a kit
+                      {t("diy_section_title")}
                     </h3>
                     <p className="DiyTutorials__lead">
-                      Since you picked “I want to make it myself” with a lower
-                      budget, here are tutorials for handmade gifts.
+                      {t("diy_section_lead")}
                     </p>
                     <ul className="DiyTutorials__list">
                       {visibleDiyTutorials.map((item) => (
@@ -2560,16 +3079,15 @@ export default function App() {
                   result.gifts.length > 0 &&
                   !budgetUnlimited && (
                     <p className="Banner Banner--warn" role="status">
-                      Nothing fit under{" "}
-                      {formatMoney(budgetInCurrency, currency)}. Here are the
-                      closest options—consider nudging the budget.
+                      {t("stretch_banner", {
+                        amount: formatMoney(budgetInCurrency, currency),
+                      })}
                     </p>
                   )}
 
                 {result.gifts.length === 0 && (
                   <p className="Banner" role="status">
-                    No matches for this combination—try another hobby or adjust
-                    the budget.
+                    {t("no_matches_combo")}
                   </p>
                 )}
 
@@ -2582,7 +3100,7 @@ export default function App() {
                       id="liked-section-title"
                       className="LikedSection__title"
                     >
-                      Saved likes
+                      {t("saved_likes")}
                     </h3>
                     <ul className="LikedSection__list">
                       {likedEntries.map((entry) => {
@@ -2601,7 +3119,7 @@ export default function App() {
                               <span className="LikedSection__price">
                                 {formatApproxGiftPrice(lpLocal, currency)}
                                 {isGroupRecipient && (
-                                  <> total for {safeGroupSize} people</>
+                                  <> {t("total_for_n", { n: safeGroupSize })}</>
                                 )}
                               </span>
                             </div>
@@ -2610,7 +3128,7 @@ export default function App() {
                               className="Btn Btn--ghost Btn--small"
                               onClick={() => removeLikedEntry(entry.key)}
                             >
-                              Remove
+                              {t("remove")}
                             </button>
                           </li>
                         );
@@ -2623,8 +3141,7 @@ export default function App() {
                   result.gifts.length > 0 &&
                   result.gifts.every((g) => dislikedIds.includes(g.id)) && (
                     <p className="Banner" role="status">
-                      Nothing left in this list—use <strong>More ideas</strong>{" "}
-                      for a fresh batch (your saved likes stay below).
+                      {t("nothing_left_banner", { more: t("more_strong") })}
                     </p>
                   )}
 
@@ -2633,7 +3150,7 @@ export default function App() {
                   dislikedIds.length > 0 &&
                   result.gifts.length > 0 && (
                     <p className="Banner" role="status">
-                      No gifts match this hobby after your dislikes.
+                      {t("no_gifts_after_dislikes")}
                     </p>
                   )}
                 {visibleShortlistGifts.length === 0 &&
@@ -2644,8 +3161,7 @@ export default function App() {
                   )}
                 {showCustomOnlyFallbackBanner && (
                   <p className="Banner Banner--info" role="status">
-                    No gift suggestions matched the selected hobbies, so
-                    showing other available gifts.
+                    {t("custom_fallback_banner")}
                   </p>
                 )}
 
@@ -2674,11 +3190,11 @@ export default function App() {
                     const imageSearchQuery = buildImageSearchQuery(
                       product,
                       gift,
+                      recapParts,
                     );
                     const links = getRetailerLinks(product.name, countryCode);
                     const multi = gift.variants.length > 1;
                     const refining = refiningId === gift.id;
-                    const refineLabel = "Refine";
                     const isLiked = likedEntries.some(
                       (e) => e.gift.id === gift.id,
                     );
@@ -2695,7 +3211,9 @@ export default function App() {
                       >
                         <div className="GiftCard__media">
                           {top && (
-                            <div className="GiftCard__ribbon">Top pick</div>
+                            <div className="GiftCard__ribbon">
+                              {t("top_pick")}
+                            </div>
                           )}
                           <ProductImage
                             key={`${gift.id}-${product.id}`}
@@ -2707,7 +3225,7 @@ export default function App() {
                         <div className="GiftCard__body">
                           {showOverBudgetNotice && (
                             <p className="GiftCard__budgetNote" role="status">
-                              This item is relevant, but above your budget.
+                              {t("over_budget_note")}
                             </p>
                           )}
                           {gift.categoryTitle && (
@@ -2727,23 +3245,25 @@ export default function App() {
                                   className={`VoteBtn VoteBtn--like${isLiked ? " VoteBtn--on" : ""}`}
                                   onClick={() => toggleLikeGift(gift)}
                                   aria-pressed={isLiked}
-                                  aria-label={isLiked ? "Unlike" : "Like"}
+                                  aria-label={isLiked ? t("unlike") : t("like")}
                                 >
                                   <span className="VoteBtn__icon" aria-hidden>
                                     👍
                                   </span>
-                                  <span>{isLiked ? "Liked" : "Like"}</span>
+                                  <span>
+                                    {isLiked ? t("liked") : t("like")}
+                                  </span>
                                 </button>
                                 <button
                                   type="button"
                                   className="VoteBtn VoteBtn--dislike"
                                   onClick={() => dislikeGift(gift.id)}
-                                  aria-label="Dislike — hide this idea"
+                                  aria-label={t("dislike_aria")}
                                 >
                                   <span className="VoteBtn__icon" aria-hidden>
                                     👎
                                   </span>
-                                  <span>Dislike</span>
+                                  <span>{t("dislike")}</span>
                                 </button>
                               </div>
                               <div className="GiftCard__score">
@@ -2752,14 +3272,21 @@ export default function App() {
                                 </span>
                                 {isGroupRecipient && (
                                   <span className="GiftCard__priceMeta">
-                                    total for {safeGroupSize} people (
+                                    {t("price_total_for", { n: safeGroupSize })}{" "}
+                                    (
                                     {formatApproxGiftPrice(eachLocal, currency)}{" "}
-                                    each)
+                                    {t("each")})
                                   </span>
                                 )}
                                 <span className="GiftCard__rating">
                                   {product.rating.toFixed(1)}{" "}
-                                  <Stars value={product.rating} />
+                                  <Stars
+                                    value={product.rating}
+                                    ariaLabel={t("stars_aria", {
+                                      value: product.rating.toFixed(1),
+                                      max: 5,
+                                    })}
+                                  />
                                 </span>
                               </div>
                             </div>
@@ -2773,13 +3300,13 @@ export default function App() {
                               disabled={openingGiftId === gift.id}
                             >
                               {openingGiftId === gift.id
-                                ? "Finding best store…"
-                                : "I want this"}
+                                ? t("want_finding")
+                                : t("want_this")}
                             </button>
                             <p className="GiftCard__wantHint">
                               {groqReady
-                                ? "Opens a shopping search picked for your region (smart routing when available)."
-                                : "Opens Google Shopping to compare prices across stores."}
+                                ? t("want_hint_groq")
+                                : t("want_hint_google")}
                             </p>
                             {wantThisErrorByGiftId[gift.id] && (
                               <p className="RefineBlock__error" role="status">
@@ -2796,7 +3323,7 @@ export default function App() {
                                 onClick={() => handleAlternate(gift)}
                                 disabled={refining}
                               >
-                                Show another option in this category
+                                {t("show_another")}
                               </button>
                             )}
                             <div className="RefineBlock">
@@ -2804,7 +3331,7 @@ export default function App() {
                                 className="FieldLabel"
                                 htmlFor={`refine-${gift.id}`}
                               >
-                                Be more specific
+                                {t("refine_label")}
                               </label>
                               <div className="RefineBlock__row">
                                 <input
@@ -2813,6 +3340,7 @@ export default function App() {
                                   placeholder={refinePlaceholderForGift(
                                     gift,
                                     product,
+                                    t,
                                   )}
                                   value={refineByGiftId[gift.id] ?? ""}
                                   onChange={(e) =>
@@ -2837,19 +3365,21 @@ export default function App() {
                                     refining || !refineByGiftId[gift.id]?.trim()
                                   }
                                 >
-                                  {refining ? "Thinking…" : refineLabel}
+                                  {refining
+                                    ? t("refine_thinking")
+                                    : t("refine_btn")}
                                 </button>
                               </div>
                               <p className="RefineBlock__hint">
                                 {groqReady
                                   ? result.source === "groq"
-                                    ? "Picks the variant on this card that best matches your note (or keyword matching if smart refine isn’t available)."
-                                    : "Reads your note and chooses the best option from this card’s catalog list."
-                                  : "On-device keyword matching picks a variant from this list."}
+                                    ? t("refine_hint_groq_cat")
+                                    : t("refine_hint_groq_list")
+                                  : t("refine_hint_local")}
                               </p>
                               {groqNoteByGiftId[gift.id] && (
                                 <p className="RefineBlock__aiNote">
-                                  <strong>Note:</strong>{" "}
+                                  <strong>{t("note_prefix")}</strong>{" "}
                                   {groqNoteByGiftId[gift.id]}
                                 </p>
                               )}
@@ -2863,7 +3393,7 @@ export default function App() {
 
                           <div className="Retailers">
                             <h4 className="Retailers__title">
-                              Shop this product (search)
+                              {t("shop_title")}
                             </h4>
                             <div className="Retailers__grid">
                               {links.map((link) => (
@@ -2883,19 +3413,25 @@ export default function App() {
                           <div className="Reviews">
                             <h4 className="Reviews__title">
                               {gift._aiGenerated
-                                ? "Buyer-style reviews"
-                                : "What buyers often say"}
+                                ? t("reviews_ai_title")
+                                : t("reviews_cat_title")}
                             </h4>
                             <p className="Reviews__disclaimer">
                               {gift._aiGenerated
-                                ? "Sample reviews typical of marketplace listings—always open the seller’s page to read verified feedback before you buy."
-                                : "Representative comments for this product type—each store shows real, verified reviews on the listing."}
+                                ? t("reviews_ai_disclaimer")
+                                : t("reviews_cat_disclaimer")}
                             </p>
                             <ul className="Reviews__list">
                               {product.reviews.map((rev, i) => (
                                 <li key={i} className="Review">
                                   <div className="Review__meta">
-                                    <Stars value={rev.stars} />
+                                    <Stars
+                                      value={rev.stars}
+                                      ariaLabel={t("stars_aria", {
+                                        value: rev.stars,
+                                        max: 5,
+                                      })}
+                                    />
                                     <span className="Review__author">
                                       {rev.author}
                                     </span>
@@ -2921,7 +3457,7 @@ export default function App() {
                     <button
                       type="button"
                       className="CaseModal__backdrop"
-                      aria-label="Close"
+                      aria-label={t("case_close_aria")}
                       onClick={() => !caseRunning && setCaseOpen(false)}
                     />
                     <div className="CaseModal__panel">
@@ -2929,12 +3465,9 @@ export default function App() {
                         id="pick-for-me-modal-title"
                         className="CaseModal__title"
                       >
-                        Picking an option for you
+                        {t("case_title")}
                       </h3>
-                      <p className="CaseModal__lede">
-                        Your liked ideas scroll past the marker, then we land on
-                        one gift to suggest.
-                      </p>
+                      <p className="CaseModal__lede">{t("case_lede")}</p>
                       <div className="CaseViewport" ref={caseViewportRef}>
                         <div
                           className="CaseViewport__glow CaseViewport__glow--left"
@@ -2977,12 +3510,12 @@ export default function App() {
                           onClick={startCaseOpening}
                           disabled={caseRunning || likedEntries.length < 2}
                         >
-                          {caseRunning ? "Choosing…" : "Choose for me"}
+                          {caseRunning ? t("case_choosing") : t("case_choose")}
                         </button>
                         {caseWinner && (
                           <p className="CaseModal__winner" role="status">
                             <span className="CaseModal__winnerLabel">
-                              You should gift:
+                              {t("case_you_should")}
                             </span>
                             <strong>
                               {displayProduct(caseWinner.gift).name}
@@ -2994,7 +3527,7 @@ export default function App() {
                           className="Btn Btn--ghost"
                           onClick={() => !caseRunning && setCaseOpen(false)}
                         >
-                          Close
+                          {t("case_close")}
                         </button>
                       </div>
                     </div>
@@ -3007,7 +3540,7 @@ export default function App() {
                     className="Btn Btn--primary"
                     onClick={restart}
                   >
-                    Pick gift for someone else
+                    {t("pick_else")}
                   </button>
                 </div>
               </section>
@@ -3018,18 +3551,16 @@ export default function App() {
 
       <footer className="Footer">
         <section className="Footer__section">
-          <h4 className="Footer__title">Made by Tal Vilozny</h4>
-          <p className="Footer__line">
-            Frontend Developer crafting beautiful, performant web experiences
-          </p>
+          <h4 className="Footer__title">{t("footer_by")}</h4>
+          <p className="Footer__line">{t("footer_line")}</p>
           <a className="Footer__link" href="mailto:TalVilozny@gmail.com">
             TalVilozny@gmail.com
           </a>
         </section>
         <p className="Footer__copyright">
-          © 2026 Tal Vilozny. All rights reserved. •{" "}
+          {t("footer_rights")} •{" "}
           <a className="Footer__link" href={PRIVACY_PATH}>
-            Privacy Policy
+            {t("footer_privacy")}
           </a>
         </p>
       </footer>

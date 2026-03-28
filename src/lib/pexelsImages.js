@@ -39,10 +39,24 @@ function scorePhotoForQuery(photo, query) {
   for (const token of q) {
     if (altSet.has(token)) score += 3;
   }
-  // Small penalty for clearly generic stock/desk shots when query is specific.
   const altText = String(photo?.alt ?? "").toLowerCase();
+  const qBlob = q.join(" ");
+  // Penalize obvious category mismatches (stock photos often mis-tagged).
+  const mismatchPairs = [
+    [/coffee|espresso|latte|brew|barista|moka|french\s*press/, /\bwatch|wristwatch|clock|jewelry|ring\b/],
+    [/watch|timepiece|wristwatch/, /\bcoffee|espresso|brew|barista\b/],
+    [/keyboard|mouse|gpu|monitor|laptop|pc\b/, /\bwatch|coffee|wine|flower\b/],
+    [/headphone|earbud|speaker/, /\bwatch|coffee|knife|kitchen\b/],
+  ];
+  for (const [wantRe, badRe] of mismatchPairs) {
+    if (wantRe.test(qBlob) && badRe.test(altText)) score -= 8;
+  }
+  // Small penalty for clearly generic stock/desk shots when query is specific.
   if (q.length >= 3 && /\bdesk|workspace|office|laptop\b/.test(altText)) {
-    score -= 1;
+    score -= 2;
+  }
+  if (q.length >= 4 && /\bgift\b|present\b|celebration\b/.test(altText) && !qBlob.includes("gift")) {
+    score -= 2;
   }
   return score;
 }
@@ -57,7 +71,7 @@ async function searchPexelsOnce(query, orientation, apiKey) {
   const q = query.replace(/\s+/g, " ").trim().slice(0, 100);
   if (!q) return null;
 
-  const params = new URLSearchParams({ query: q, per_page: "8" });
+  const params = new URLSearchParams({ query: q, per_page: "15" });
   if (orientation) params.set("orientation", orientation);
 
   const res = await fetch(`https://api.pexels.com/v1/search?${params}`, {
@@ -68,7 +82,12 @@ async function searchPexelsOnce(query, orientation, apiKey) {
   const data = await res.json();
   const photos = Array.isArray(data.photos) ? data.photos : [];
   photos.sort((a, b) => scorePhotoForQuery(b, q) - scorePhotoForQuery(a, q));
+  const bestScore =
+    photos.length > 0 ? scorePhotoForQuery(photos[0], q) : -999;
+  const minOk = tokenize(q).length >= 4 ? 2 : 1;
+  if (bestScore < minOk) return null;
   for (const photo of photos) {
+    if (scorePhotoForQuery(photo, q) < minOk) continue;
     const src = pickPhotoSrc(photo);
     if (src) return src;
   }
@@ -97,9 +116,8 @@ export async function fetchPexelsImageUrl(query) {
     let src =
       (await searchPexelsOnce(q, "landscape", apiKey)) ||
       (await searchPexelsOnce(q, null, apiKey)) ||
-      (await searchPexelsOnce(`${short} gift`, "landscape", apiKey)) ||
-      (await searchPexelsOnce(short, null, apiKey)) ||
-      (await searchPexelsOnce("gift present celebration", "landscape", apiKey));
+      (await searchPexelsOnce(short, "landscape", apiKey)) ||
+      (await searchPexelsOnce(short, null, apiKey));
 
     if (src) cache.set(q, src);
     return src;

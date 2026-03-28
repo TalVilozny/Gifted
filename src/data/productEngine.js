@@ -124,24 +124,61 @@ export function expandGiftRow(g) {
 }
 
 /**
+ * Prefer variants within [min, max] when possible; relax if nothing fits.
+ * @param {ProductVariant[]} variants
+ * @param {number} budgetCap
+ * @param {number} [minBudgetUSD=0]
+ * @returns {ProductVariant[]}
+ */
+export function selectVariantPool(variants, budgetCap, minBudgetUSD = 0) {
+  const min = Math.max(0, Number(minBudgetUSD) || 0);
+  if (!variants.length) return variants;
+  if (isUnlimitedBudget(budgetCap)) {
+    const above = variants.filter((v) => v.priceUSD >= min);
+    if (above.length) return above;
+    if (min > 0) return [];
+    return variants;
+  }
+  const inRange = variants.filter(
+    (v) => v.priceUSD >= min && v.priceUSD <= budgetCap,
+  );
+  if (inRange.length) return inRange;
+  // At or above minimum, even if over cap (card may show as above budget).
+  const atLeastMin = variants.filter((v) => v.priceUSD >= min);
+  if (atLeastMin.length) return atLeastMin;
+  if (min > 0) {
+    return [];
+  }
+  const underCap = variants.filter((v) => v.priceUSD <= budgetCap);
+  if (underCap.length) return underCap;
+  return variants;
+}
+
+/**
  * @param {ProductVariant[]} variants
  * @param {number} budgetUSD
+ * @param {number} [minBudgetUSD=0]
  */
-export function pickBestVariantForBudget(variants, budgetUSD) {
+export function pickBestVariantForBudget(variants, budgetUSD, minBudgetUSD = 0) {
+  const pool = selectVariantPool(variants, budgetUSD, minBudgetUSD);
+  const min = Math.max(0, Number(minBudgetUSD) || 0);
+  if (!pool.length) {
+    return min > 0 ? null : variants[0];
+  }
   if (isUnlimitedBudget(budgetUSD)) {
-    return [...variants].sort(
+    return [...pool].sort(
       (a, b) =>
         b.priceUSD - a.priceUSD ||
         b.rating - a.rating ||
         a.name.localeCompare(b.name),
     )[0];
   }
-  const inB = variants.filter((v) => v.priceUSD <= budgetUSD);
-  const pool = inB.length ? inB : [...variants];
+  const cap = budgetUSD;
+  const inB = pool.filter((v) => v.priceUSD <= cap);
   if (!inB.length) {
     return [...pool].sort((a, b) => a.priceUSD - b.priceUSD)[0];
   }
-  return [...pool].sort(
+  return [...inB].sort(
     (a, b) =>
       b.rating - a.rating ||
       b.priceUSD - a.priceUSD ||
@@ -261,10 +298,21 @@ export function sortVariantsForGiftPick(variants, budgetCap, pickContext) {
  * @param {ProductVariant[]} variants
  * @param {number} budgetCap
  * @param {{ groups?: { terms: string[] }[] }} pickContext
+ * @param {number} [minBudgetUSD=0]
  */
-export function pickBestVariantForBudgetScored(variants, budgetCap, pickContext) {
-  const sorted = sortVariantsForGiftPick(variants, budgetCap, pickContext);
-  return sorted[0] ?? variants[0];
+export function pickBestVariantForBudgetScored(
+  variants,
+  budgetCap,
+  pickContext,
+  minBudgetUSD = 0,
+) {
+  const pool = selectVariantPool(variants, budgetCap, minBudgetUSD);
+  const min = Math.max(0, Number(minBudgetUSD) || 0);
+  if (!pool.length) {
+    return min > 0 ? null : variants[0];
+  }
+  const sorted = sortVariantsForGiftPick(pool, budgetCap, pickContext);
+  return sorted[0] ?? pool[0];
 }
 
 /**
@@ -272,11 +320,22 @@ export function pickBestVariantForBudgetScored(variants, budgetCap, pickContext)
  * @param {string} currentId
  * @param {number} budgetUSD
  * @param {{ groups?: { terms: string[] }[] } | null} [pickContext]
+ * @param {number} [minBudgetUSD=0]
  */
-export function pickNextAlternate(variants, currentId, budgetUSD, pickContext = null) {
-  const order = sortVariantsForGiftPick(variants, budgetUSD, pickContext);
+export function pickNextAlternate(
+  variants,
+  currentId,
+  budgetUSD,
+  pickContext = null,
+  minBudgetUSD = 0,
+) {
+  const pool = selectVariantPool(variants, budgetUSD, minBudgetUSD);
+  const basis = pool.length
+    ? pool
+    : sortVariantsForGiftPick(variants, budgetUSD, pickContext);
+  const order = sortVariantsForGiftPick(basis, budgetUSD, pickContext);
   const idx = order.findIndex((v) => v.id === currentId);
-  if (idx < 0) return order[0];
+  if (idx < 0) return order[0] ?? variants[0];
   return order[(idx + 1) % order.length];
 }
 
@@ -291,12 +350,20 @@ export function pickVariantFromRefinement(
   query,
   budgetUSD,
   pickContext = null,
+  minBudgetUSD = 0,
 ) {
+  const min = Math.max(0, Number(minBudgetUSD) || 0);
   const raw = tokenizeQuery(query);
   if (raw.length === 0) {
-    return pickContext?.groups?.length
-      ? pickBestVariantForBudgetScored(variants, budgetUSD, pickContext)
-      : pickBestVariantForBudget(variants, budgetUSD);
+    const fb = pickContext?.groups?.length
+      ? pickBestVariantForBudgetScored(
+          variants,
+          budgetUSD,
+          pickContext,
+          min,
+        )
+      : pickBestVariantForBudget(variants, budgetUSD, min);
+    return fb ?? variants[0];
   }
   const wanted = new Set(raw);
   for (const tok of raw) {
@@ -326,8 +393,13 @@ export function pickVariantFromRefinement(
     if (!isUnlimitedBudget(budgetUSD)) {
       if (v.priceUSD <= budgetUSD) score += 3;
       else score -= (v.priceUSD - budgetUSD) * 0.02;
+      if (min > 0) {
+        if (v.priceUSD >= min && v.priceUSD <= budgetUSD) score += 5;
+        else if (v.priceUSD < min) score -= 4;
+      }
     } else {
       score += Math.min(12, v.priceUSD / 400);
+      if (min > 0 && v.priceUSD < min) score -= 4;
     }
     score += v.rating * 1.2;
     return { v, score };
@@ -336,9 +408,10 @@ export function pickVariantFromRefinement(
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
   if (!best || best.score < 1) {
-    return pickContext?.groups?.length
-      ? pickBestVariantForBudgetScored(variants, budgetUSD, pickContext)
-      : pickBestVariantForBudget(variants, budgetUSD);
+    const fb = pickContext?.groups?.length
+      ? pickBestVariantForBudgetScored(variants, budgetUSD, pickContext, min)
+      : pickBestVariantForBudget(variants, budgetUSD, min);
+    return fb ?? variants[0];
   }
   return best.v;
 }

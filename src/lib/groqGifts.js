@@ -78,16 +78,33 @@ function slugId(s) {
   return t || "idea";
 }
 
-/** Keep model-estimated prices in a sane range vs. the user’s soft budget. */
-export function clampRetailPriceUSD(n, budgetUSD, budgetUnlimited) {
+/**
+ * Keep model-estimated prices in a sane range vs. the user’s soft budget.
+ * @param {number} [minBudgetUSD=0] when &gt; 0, never clamp below this (honors minimum-budget).
+ */
+export function clampRetailPriceUSD(
+  n,
+  budgetUSD,
+  budgetUnlimited,
+  minBudgetUSD = 0,
+) {
   const x = Number(n);
+  const minOk = Math.max(0, Number(minBudgetUSD) || 0);
   const cap =
     typeof budgetUSD === "number" && Number.isFinite(budgetUSD) ? budgetUSD : 75;
+  const softLow = minOk > 0 ? minOk : budgetUnlimited ? 10 : 15;
+
   if (!Number.isFinite(x) || x < 0) {
-    return budgetUnlimited ? 120 : Math.max(25, Math.min(cap, 500));
+    if (budgetUnlimited) {
+      return Math.max(minOk > 0 ? minOk : 120, 120);
+    }
+    return Math.max(minOk > 0 ? minOk : 25, Math.min(cap, 500));
   }
-  if (budgetUnlimited) return Math.min(Math.max(x, 10), 50_000);
-  return Math.min(Math.max(x, 15), Math.max(cap * 2.5, 400));
+  if (budgetUnlimited) {
+    return Math.min(Math.max(x, softLow), 50_000);
+  }
+  const hi = Math.max(cap * 2.5, 400);
+  return Math.min(Math.max(x, softLow), hi);
 }
 
 function primaryHobbyKey(selectedHobbyIds, customLabels) {
@@ -306,6 +323,28 @@ ${JSON.stringify(options, null, 2)}`;
  * Invent fresh gift ideas via Groq (not limited to the static catalog).
  * giftPreference: diy | experience | premade shapes the catalog-style ideas.
  */
+/** Ensures custom hobby words appear in tags so UI filters and search text match. */
+function enrichVariantTagsForCustomHobbies(rawVariants, customLabels) {
+  if (!customLabels?.length || !Array.isArray(rawVariants)) return rawVariants;
+  return rawVariants.map((v) => {
+    const tags = Array.isArray(v.tags) ? [...v.tags.map(String)] : [];
+    const blob = `${v.name ?? ""} ${v.blurb ?? ""} ${tags.join(" ")}`.toLowerCase();
+    for (const label of customLabels) {
+      const lab = String(label).trim();
+      if (!lab) continue;
+      const words = lab
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2);
+      const hit = words.some((w) => blob.includes(w));
+      if (!hit) {
+        tags.push(lab.length > 42 ? `${lab.slice(0, 39)}…` : lab);
+      }
+    }
+    return { ...v, tags: tags.slice(0, 8) };
+  });
+}
+
 export async function generateGiftIdeasWithGroq({
   hobbyTitles,
   customLabels,
@@ -319,6 +358,8 @@ export async function generateGiftIdeasWithGroq({
   recipientId = null,
   recipientAgeRange = null,
   recipientGroupSize = null,
+  relaxedCustom = false,
+  minBudgetUSD = 0,
 }) {
   if (!isGroqConfigured()) return null;
 
@@ -345,9 +386,14 @@ export async function generateGiftIdeasWithGroq({
     (customLabels?.length ?? 0) > 0 &&
     inferHobbyIdsFromCustomLabels(customLabels).length === 0;
 
+  const minUsd = Math.max(0, Number(minBudgetUSD) || 0);
+  const minInstruction =
+    !budgetUnlimited && minUsd > 0
+      ? ` Each variant’s priceUSD should be at least ~$${Math.round(minUsd)} USD when a realistic product exists at that level (user’s minimum floor).`
+      : "";
   const budgetInstruction = budgetUnlimited
     ? `Budget: UNLIMITED — include impressive premium ideas when they fit (flagship GPUs, prebuilt workstations, pro tools, luxury experiences). Use realistic US retail ballparks in priceUSD.`
-    : `Soft budget ~$${Number(budgetUSD).toFixed(0)} USD — most variants should fall near or under this; one slightly higher tier is OK if the blurb explains it.`;
+    : `Soft budget ~$${Number(budgetUSD).toFixed(0)} USD — most variants should fall near or under this; one slightly higher tier is OK if the blurb explains it.${minInstruction}`;
 
   const pref =
     giftPreference === "diy" ||
@@ -379,14 +425,20 @@ CRITICAL — **Ready-made products** they unwrap:
 - Set "diy": false unless the product is explicitly a commercial kit they assemble at home.
 `;
 
-  const customOnlySection = customOnlyNoMapped
-    ? `
-CRITICAL — **Custom-hobby focus is mandatory**:
-- The user provided free-text hobbies not mapped to stock buckets: ${JSON.stringify(customLabels)}.
-- Every gift must clearly tie back to these custom hobbies in name/blurb/tags.
-- Avoid generic fallback ideas (e.g. plain “experience gift card”, generic cash-equivalent cards, unrelated home gifts) unless explicitly tied to the custom hobby context.
+  const customOnlySection =
+    customOnlyNoMapped && !relaxedCustom
+      ? `
+FOCUS — **Custom hobbies** (user-typed; may not match preset categories): ${JSON.stringify(customLabels)}.
+- Each gift row must connect to at least one of these interests in the variant name, blurb, or tags (use recognizable keywords).
+- Prefer specific, shoppable products; put hobby words in "tags" when possible.
 `
-    : "";
+      : customOnlyNoMapped && relaxedCustom
+        ? `
+The user’s main interests are these custom hobbies: ${JSON.stringify(customLabels)}.
+- At least 14 of 18 rows must include a clear reference in name, blurb, or tags (repeat keywords is OK).
+- Concrete products only; avoid empty “gift card” rows unless the card is for a store/activity tied to those hobbies.
+`
+        : "";
 
   const excludedSection =
     excludedProductNames.length > 0
@@ -436,7 +488,10 @@ Return ONLY valid JSON:
   ]
 }`;
 
-  const text = await completeGroq(prompt, { temperature: 0.55, max_tokens: 8192 });
+  const text = await completeGroq(prompt, {
+    temperature: relaxedCustom ? 0.48 : 0.55,
+    max_tokens: 8192,
+  });
   const parsed = extractJsonObject(text);
   const rawList = parsed.gifts;
   if (!Array.isArray(rawList) || rawList.length === 0) return null;
@@ -453,10 +508,20 @@ Return ONLY valid JSON:
     const base = slugId(item.stableId ?? item.category ?? `g${i}`);
     const rowId = `gq-${base}-${i}`;
 
-    const variants = vars.slice(0, 3).map((v, j) => ({
+    const varsTagged = enrichVariantTagsForCustomHobbies(
+      vars.slice(0, 3),
+      customLabels,
+    );
+
+    const variants = varsTagged.map((v, j) => ({
       id: `${rowId}-v${j}`,
       name: typeof v.name === "string" ? v.name : `Option ${j + 1}`,
-      priceUSD: clampRetailPriceUSD(v.priceUSD, budgetUSD, budgetUnlimited),
+      priceUSD: clampRetailPriceUSD(
+        v.priceUSD,
+        budgetUSD,
+        budgetUnlimited,
+        minUsd,
+      ),
       rating: 4.65,
       tags: Array.isArray(v.tags) ? v.tags.map(String).slice(0, 8) : [],
       blurb:
@@ -478,9 +543,15 @@ Return ONLY valid JSON:
       _aiGenerated: true,
     };
 
-    out.push(
-      finalizeGiftRow(row, budgetUSD, hobbyKey, budgetUnlimited, pickContext),
+    const finalized = finalizeGiftRow(
+      row,
+      budgetUSD,
+      hobbyKey,
+      budgetUnlimited,
+      pickContext,
+      minUsd,
     );
+    if (finalized) out.push(finalized);
   }
 
   if (out.length === 0) return null;
@@ -582,6 +653,7 @@ export async function enrichResultWithRetailPriceEstimates(
   recommendationBudgetUsd,
   budgetUnlimited,
   pickContext = null,
+  minBudgetUSD = 0,
 ) {
   if (!isGroqConfigured() || !rec?.gifts?.length) return rec;
 
@@ -606,32 +678,39 @@ export async function enrichResultWithRetailPriceEstimates(
         budgetUnlimited,
       });
     const cap = budgetUnlimited ? Infinity : recommendationBudgetUsd;
-    const nextGifts = rec.gifts.map((gift) => {
-      const nextVariants = (gift.variants || []).map((v) => {
-        let next = v;
-        const rawPrice = priceMap[v.id];
-        if (typeof rawPrice === "number" && Number.isFinite(rawPrice)) {
-          const priceUSD = clampRetailPriceUSD(
-            rawPrice,
-            recommendationBudgetUsd,
-            budgetUnlimited,
-          );
-          next = { ...next, priceUSD };
-        }
-        const r = ratingMap[v.id];
-        if (typeof r === "number" && Number.isFinite(r)) {
-          next = { ...next, rating: r };
-        }
-        return next;
-      });
-      return finalizeGiftRow(
-        { ...gift, variants: nextVariants },
-        cap,
-        gift._sourceHobbyId,
-        budgetUnlimited,
-        pickContext,
-      );
-    });
+    const minUsd = budgetUnlimited
+      ? 0
+      : Math.max(0, Number(minBudgetUSD) || 0);
+    const nextGifts = rec.gifts
+      .map((gift) => {
+        const nextVariants = (gift.variants || []).map((v) => {
+          let next = v;
+          const rawPrice = priceMap[v.id];
+          if (typeof rawPrice === "number" && Number.isFinite(rawPrice)) {
+            const priceUSD = clampRetailPriceUSD(
+              rawPrice,
+              recommendationBudgetUsd,
+              budgetUnlimited,
+              minUsd,
+            );
+            next = { ...next, priceUSD };
+          }
+          const r = ratingMap[v.id];
+          if (typeof r === "number" && Number.isFinite(r)) {
+            next = { ...next, rating: r };
+          }
+          return next;
+        });
+        return finalizeGiftRow(
+          { ...gift, variants: nextVariants },
+          cap,
+          gift._sourceHobbyId,
+          budgetUnlimited,
+          pickContext,
+          minUsd,
+        );
+      })
+      .filter(Boolean);
     const sorted = pickContext?.groups?.length
       ? sortFinalizedGiftsForDisplay(
           nextGifts,
