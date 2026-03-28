@@ -31,9 +31,20 @@ async function readJsonBody(req) {
 }
 
 function resolveKey() {
+  const tryKey = (v) => {
+    if (typeof v !== "string") return "";
+    let t = v.replace(/\r/g, "").trim();
+    if (
+      (t.startsWith('"') && t.endsWith('"')) ||
+      (t.startsWith("'") && t.endsWith("'"))
+    ) {
+      t = t.slice(1, -1).trim();
+    }
+    return t;
+  };
   return (
-    process.env.GROQ_API_KEY?.trim() ||
-    process.env.VITE_GROQ_API_KEY?.trim() ||
+    tryKey(process.env.GROQ_API_KEY) ||
+    tryKey(process.env.VITE_GROQ_API_KEY) ||
     ""
   );
 }
@@ -54,7 +65,8 @@ export default async function handler(req, res) {
       ...(ok
         ? {}
         : {
-            hint: "Set GROQ_API_KEY in Vercel → Project → Environment Variables, then Redeploy. Local .env is not deployed.",
+            hint:
+              "Server still sees no key: (1) Redeploy after adding the variable. (2) Enable it for the environment you use (Production vs Preview). (3) Name must be exactly GROQ_API_KEY. (4) In production the app always uses /api/groq — remove VITE_GROQ_API_KEY from Vercel if you rely on the server key only.",
           }),
     });
     return;

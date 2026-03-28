@@ -1,13 +1,15 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
   "functions": {
-    "api/groq.js": { "maxDuration": 60 },
-    "api/pexels.js": { "maxDuration": 30 }
+    "api/groq.js": {
+      "maxDuration": 60,
+      "includeFiles": "lib/**"
+    },
+    "api/pexels.js": {
+      "maxDuration": 30,
+      "includeFiles": "lib/**"
+    }
   },
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

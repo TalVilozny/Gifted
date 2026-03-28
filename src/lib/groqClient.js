@@ -10,18 +10,18 @@
 const DEFAULT_BASE = "https://api.groq.com/openai/v1";
 
 /**
- * Use POST /api/groq (server key) when there is no browser key.
- * - Dev: enabled when vite define sets VITE_GROQ_USE_PROXY (e.g. GROQ_API_KEY in .env).
- * - Production (Vercel): always try the proxy — key may exist only at runtime, not at build.
+ * Dev-only: use Vite dev proxy when GROQ_API_KEY exists without VITE_GROQ_API_KEY.
+ * Production: always use `/api/groq` — Groq does not support browser calls with API keys
+ * (CORS), and `VITE_GROQ_API_KEY` in Vercel must not override the server-only key.
  */
 function useGroqProxyPath() {
   if (import.meta.env.VITE_GROQ_API_KEY?.trim()) return false;
   if (import.meta.env.VITE_GROQ_USE_PROXY === "true") return true;
-  if (import.meta.env.PROD) return true;
   return false;
 }
 
 export function isGroqConfigured() {
+  if (import.meta.env.PROD) return true;
   return Boolean(
     import.meta.env.VITE_GROQ_API_KEY?.trim() || useGroqProxyPath(),
   );
@@ -35,12 +35,16 @@ function apiBase() {
   return import.meta.env.VITE_GROQ_API_BASE?.trim() || DEFAULT_BASE;
 }
 
-/** Same-origin URL for the serverless Groq proxy (respects Vite `base`). */
+/** Same-origin absolute URL for the serverless Groq proxy (respects Vite `base`). */
 function groqProxyUrl() {
   const base = import.meta.env.BASE_URL || "/";
   const root = base.endsWith("/") ? base : `${base}/`;
   const path = `${root}api/groq`.replace(/\/{2,}/g, "/");
-  return path.startsWith("/") ? path : `/${path}`;
+  const rel = path.startsWith("/") ? path : `/${path}`;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return new URL(rel, `${window.location.origin}/`).href;
+  }
+  return rel;
 }
 
 /**
@@ -129,6 +133,9 @@ async function completeGroqProxy(prompt, options = {}) {
  */
 export async function completeGroq(prompt, options = {}) {
   const merged = { ...options, model: options.model ?? getGroqModelName() };
+  if (import.meta.env.PROD) {
+    return completeGroqProxy(prompt, merged);
+  }
   if (import.meta.env.VITE_GROQ_API_KEY?.trim()) {
     return completeGroqDirect(prompt, merged);
   }
