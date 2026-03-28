@@ -9,6 +9,17 @@
 
 const DEFAULT_BASE = "https://api.groq.com/openai/v1";
 
+/** Abort hung requests so the UI never waits indefinitely (proxy, dev direct, or local key). */
+const GROQ_FETCH_TIMEOUT_MS = 100_000;
+
+function fetchWithGroqTimeout(url, init = {}) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), GROQ_FETCH_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(id),
+  );
+}
+
 /**
  * Dev-only: use Vite dev proxy when GROQ_API_KEY exists without VITE_GROQ_API_KEY.
  * Production: always use `/api/groq` — Groq does not support browser calls with API keys
@@ -105,7 +116,7 @@ async function completeGroqProxy(prompt, options = {}) {
       },
     };
 
-    const res = await fetch(groqProxyUrl(), {
+    const res = await fetchWithGroqTimeout(groqProxyUrl(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

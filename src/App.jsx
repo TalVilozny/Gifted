@@ -1350,20 +1350,7 @@ export default function App() {
     return rec;
   }
 
-  async function goBudget() {
-    if (!hasPassions || !giftPreference) return;
-    setVariantByGiftId({});
-    setRefineByGiftId({});
-    setGroqNoteByGiftId({});
-    setRefineErrorByGiftId({});
-    setWantThisErrorByGiftId({});
-    setDislikedIds([]);
-    setStep("thinking");
-    setResult(null);
-
-    await new Promise((r) => setTimeout(r, 500));
-
-    const rec = await fetchRecommendationsCore();
+  async function finalizeRecommendationResult(rec) {
     const stamped = stampGiftIdsForResult(rec);
     let priced = groqReady
       ? await enrichResultWithRetailPriceEstimates(
@@ -1404,13 +1391,53 @@ export default function App() {
           budgetUnlimited || sorted.some((g) => g._inBudget) ? "in" : "stretch",
       };
     }
-    setResult(priced);
-    if (giftPref === "diy") {
-      setDiyTutorialIds((prev) =>
-        pickRandomTutorialIds(DIY_TUTORIALS, 3, prev),
-      );
+    return priced;
+  }
+
+  async function goBudget() {
+    if (!hasPassions || !giftPreference) return;
+    setVariantByGiftId({});
+    setRefineByGiftId({});
+    setGroqNoteByGiftId({});
+    setRefineErrorByGiftId({});
+    setWantThisErrorByGiftId({});
+    setDislikedIds([]);
+    setStep("thinking");
+    setResult(null);
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    try {
+      const rec = await fetchRecommendationsCore();
+      const priced = await finalizeRecommendationResult(rec);
+      setResult(priced);
+      if (giftPref === "diy") {
+        setDiyTutorialIds((prev) =>
+          pickRandomTutorialIds(DIY_TUTORIALS, 3, prev),
+        );
+      }
+    } catch (e) {
+      console.error(e);
+      try {
+        const catalogRec = getRecommendations({
+          selectedHobbyIds,
+          customLabels: customHobbies,
+          gender,
+          budgetUSD: recommendationBudgetUsd,
+          minBudgetUSD: recommendationMinBudgetUsd,
+          wantDIY: giftPref === "diy",
+          giftPreference: giftPref,
+          budgetUnlimited,
+        });
+        const priced = await finalizeRecommendationResult(catalogRec);
+        setResult(priced);
+      } catch (e2) {
+        console.error(e2);
+        setResult(null);
+      }
+    } finally {
+      setStep("results");
     }
-    setStep("results");
   }
 
   async function reloadSuggestions() {
@@ -1423,53 +1450,30 @@ export default function App() {
     setDislikedIds([]);
     try {
       const rec = await fetchRecommendationsCore();
-      const stamped = stampGiftIdsForResult(rec);
-      let priced = groqReady
-        ? await enrichResultWithRetailPriceEstimates(
-            stamped,
-            recommendationBudgetUsd,
-            budgetUnlimited,
-            giftPickContext,
-            recommendationMinBudgetUsd,
-          )
-        : stamped;
-      priced = dropGiftsBelowMinBudget(
-        priced,
-        recommendationMinBudgetUsd,
-        budgetUnlimited,
-      );
-      priced = padResultToMinimumGifts(priced, MIN_RESULT_GIFTS, {
-        selectedHobbyIds,
-        customLabels: customHobbies,
-        gender,
-        budgetUSD: recommendationBudgetUsd,
-        minBudgetUSD: recommendationMinBudgetUsd,
-        wantDIY: giftPref === "diy",
-        giftPreference: giftPref,
-        budgetUnlimited,
-      });
-      if (priced?.gifts?.length) {
-        const sorted = sortFinalizedGiftsForDisplay(
-          priced.gifts,
-          recommendationBudgetUsd,
-          budgetUnlimited,
-          giftPickContext,
-          recommendationMinBudgetUsd,
-        );
-        priced = {
-          ...priced,
-          gifts: sorted,
-          mode:
-            budgetUnlimited || sorted.some((g) => g._inBudget)
-              ? "in"
-              : "stretch",
-        };
-      }
+      const priced = await finalizeRecommendationResult(rec);
       setResult(priced);
       if (giftPref === "diy") {
         setDiyTutorialIds((prev) =>
           pickRandomTutorialIds(DIY_TUTORIALS, 3, prev),
         );
+      }
+    } catch (e) {
+      console.error(e);
+      try {
+        const catalogRec = getRecommendations({
+          selectedHobbyIds,
+          customLabels: customHobbies,
+          gender,
+          budgetUSD: recommendationBudgetUsd,
+          minBudgetUSD: recommendationMinBudgetUsd,
+          wantDIY: giftPref === "diy",
+          giftPreference: giftPref,
+          budgetUnlimited,
+        });
+        const priced = await finalizeRecommendationResult(catalogRec);
+        setResult(priced);
+      } catch (e2) {
+        console.error(e2);
       }
     } finally {
       setIsReloading(false);
