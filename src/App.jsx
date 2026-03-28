@@ -1352,30 +1352,15 @@ export default function App() {
 
   async function finalizeRecommendationResult(rec) {
     const stamped = stampGiftIdsForResult(rec);
-    /** Cap retail pricing phase so many Groq chunks cannot add minutes after ideas are ready. */
-    const enrichDeadlineMs = 85_000;
-    let priced = stamped;
-    if (groqReady) {
-      try {
-        priced = await Promise.race([
-          enrichResultWithRetailPriceEstimates(
-            stamped,
-            recommendationBudgetUsd,
-            budgetUnlimited,
-            giftPickContext,
-            recommendationMinBudgetUsd,
-          ),
-          new Promise((_, reject) => {
-            setTimeout(
-              () => reject(new Error("enrich-deadline")),
-              enrichDeadlineMs,
-            );
-          }),
-        ]);
-      } catch {
-        priced = stamped;
-      }
-    }
+    let priced = groqReady
+      ? await enrichResultWithRetailPriceEstimates(
+          stamped,
+          recommendationBudgetUsd,
+          budgetUnlimited,
+          giftPickContext,
+          recommendationMinBudgetUsd,
+        )
+      : stamped;
     priced = dropGiftsBelowMinBudget(
       priced,
       recommendationMinBudgetUsd,
