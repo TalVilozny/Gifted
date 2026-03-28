@@ -1,4 +1,7 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "functions": {
     "api/groq.js": { "maxDuration": 60 },
     "api/pexels.js": { "maxDuration": 30 }

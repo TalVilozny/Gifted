@@ -1,6 +1,11 @@
 /**
  * Vercel Serverless Function — calls Groq with a server-only API key.
- * Set GROQ_API_KEY in Project → Environment Variables (no VITE_ prefix).
+ *
+ * `.env` is not uploaded to Vercel (gitignored). You must add the same key in:
+ * Vercel → Project → Settings → Environment Variables → `GROQ_API_KEY`
+ * Enable it for Production (and Preview if you test preview URLs), then Redeploy.
+ *
+ * GET /api/groq → `{ configured: true|false }` — open in a browser to verify.
  *
  * Uses raw Node response methods for compatibility (res.json is not always present).
  */
@@ -44,7 +49,14 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const ok = Boolean(resolveKey());
     res.setHeader("X-GiftPicker-AI", "groq-proxy-health");
-    sendJson(res, 200, { configured: ok });
+    sendJson(res, 200, {
+      configured: ok,
+      ...(ok
+        ? {}
+        : {
+            hint: "Set GROQ_API_KEY in Vercel → Project → Environment Variables, then Redeploy. Local .env is not deployed.",
+          }),
+    });
     return;
   }
 
