@@ -1,45 +1,15 @@
 /**
  * Groq (OpenAI-compatible chat completions) — fast inference for JSON tasks.
  *
- * **Local / client key:** `VITE_GROQ_API_KEY` in `.env` (browser; OK for dev).
- * **Production (Vercel):** set `GROQ_API_KEY` for **Runtime** (and Build if you want).
- * The app calls `/api/groq` in production when no `VITE_GROQ_API_KEY` is set.
- * Keys: https://console.groq.com/
+ * Set `VITE_GROQ_API_KEY` in `.env` (local) or in Vercel **Environment Variables** for the
+ * build (Vite inlines `VITE_*` into the browser bundle — same visibility model as before
+ * the serverless proxy). Keys: https://console.groq.com/
  */
 
 const DEFAULT_BASE = "https://api.groq.com/openai/v1";
 
-/**
- * Must stay **below** Vercel `functions.*.maxDuration` (e.g. 60s for `api/groq.js`).
- * If the client waits longer than the serverless limit, the function is killed and some
- * browsers leave the fetch pending indefinitely (no response body, abort never seen).
- */
-const GROQ_FETCH_TIMEOUT_MS = 52_000;
-
-function fetchWithGroqTimeout(url, init = {}) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), GROQ_FETCH_TIMEOUT_MS);
-  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
-    clearTimeout(id),
-  );
-}
-
-/**
- * Dev-only: use Vite dev proxy when GROQ_API_KEY exists without VITE_GROQ_API_KEY.
- * Production: always use `/api/groq` — Groq does not support browser calls with API keys
- * (CORS), and `VITE_GROQ_API_KEY` in Vercel must not override the server-only key.
- */
-function useGroqProxyPath() {
-  if (import.meta.env.VITE_GROQ_API_KEY?.trim()) return false;
-  if (import.meta.env.VITE_GROQ_USE_PROXY === "true") return true;
-  return false;
-}
-
 export function isGroqConfigured() {
-  if (import.meta.env.PROD) return true;
-  return Boolean(
-    import.meta.env.VITE_GROQ_API_KEY?.trim() || useGroqProxyPath(),
-  );
+  return Boolean(import.meta.env.VITE_GROQ_API_KEY?.trim());
 }
 
 export function getGroqModelName() {
@@ -50,24 +20,16 @@ function apiBase() {
   return import.meta.env.VITE_GROQ_API_BASE?.trim() || DEFAULT_BASE;
 }
 
-/** Same-origin path for the serverless Groq proxy (respects Vite `base`). Keep relative so the browser always targets the deployed origin. */
-function groqProxyUrl() {
-  const base = import.meta.env.BASE_URL || "/";
-  const root = base.endsWith("/") ? base : `${base}/`;
-  const path = `${root}api/groq`.replace(/\/{2,}/g, "/");
-  return path.startsWith("/") ? path : `/${path}`;
-}
-
 /**
  * @param {string} prompt
  * @param {{ model?: string, temperature?: number, max_tokens?: number }} [options]
  */
-async function completeGroqDirect(prompt, options = {}) {
+export async function completeGroq(prompt, options = {}) {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY?.trim();
   if (!apiKey) throw new Error("Missing VITE_GROQ_API_KEY");
 
   const model = options.model ?? getGroqModelName();
-  const res = await fetchWithGroqTimeout(`${apiBase()}/chat/completions`, {
+  const res = await fetch(`${apiBase()}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -92,80 +54,6 @@ async function completeGroqDirect(prompt, options = {}) {
     throw new Error("No text content in Groq response");
   }
   return content;
-}
-
-/**
- * One in-flight `/api/groq` at a time so bursts of Groq work (ideas + price chunks)
- * do not overlap and trip Groq rate limits (HTTP 429).
- */
-let groqProxyChain = Promise.resolve();
-
-/**
- * Server proxy (`/api/groq` on Vercel or Vite dev middleware) — uses `GROQ_API_KEY`.
- */
-async function completeGroqProxy(prompt, options = {}) {
-  const run = async () => {
-    const model = options.model ?? getGroqModelName();
-    const payload = {
-      prompt,
-      options: {
-        model,
-        temperature: options.temperature ?? 0.35,
-        max_tokens: options.max_tokens ?? 8192,
-        baseUrl: import.meta.env.VITE_GROQ_API_BASE?.trim() || undefined,
-      },
-    };
-
-    const res = await fetchWithGroqTimeout(groqProxyUrl(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-GiftPicker-AI": "groq-proxy",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const ct = res.headers.get("content-type") || "";
-    const data = ct.includes("application/json")
-      ? await res.json().catch(() => ({}))
-      : await res.text().then((t) => ({ _raw: t }));
-
-    if (!res.ok) {
-      const msg =
-        typeof data.error === "string"
-          ? data.error
-          : typeof data._raw === "string" && data._raw.includes("<!DOCTYPE")
-            ? `Groq proxy returned HTML (${res.status}) — check /api/groq on your host`
-            : `Groq proxy error (${res.status})`;
-      throw new Error(msg);
-    }
-    if (typeof data.content !== "string") {
-      throw new Error("Invalid response from Groq proxy");
-    }
-    return data.content;
-  };
-
-  const next = groqProxyChain.then(run, run);
-  groqProxyChain = next.catch(() => {}).then(() => {});
-  return next;
-}
-
-/**
- * @param {string} prompt
- * @param {{ model?: string, temperature?: number, max_tokens?: number }} [options]
- */
-export async function completeGroq(prompt, options = {}) {
-  const merged = { ...options, model: options.model ?? getGroqModelName() };
-  if (import.meta.env.PROD) {
-    return completeGroqProxy(prompt, merged);
-  }
-  if (import.meta.env.VITE_GROQ_API_KEY?.trim()) {
-    return completeGroqDirect(prompt, merged);
-  }
-  if (useGroqProxyPath()) {
-    return completeGroqProxy(prompt, merged);
-  }
-  throw new Error("Groq is not configured");
 }
 
 export function extractJsonObject(text) {

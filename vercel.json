@@ -1,9 +1,5 @@
 {
   "functions": {
-    "api/groq.js": {
-      "maxDuration": 60,
-      "includeFiles": "lib/**"
-    },
     "api/pexels.js": {
       "maxDuration": 30,
       "includeFiles": "lib/**"
