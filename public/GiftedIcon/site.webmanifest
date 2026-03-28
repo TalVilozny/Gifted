@@ -1,5 +1,5 @@
 {
-  "name": "Gifting, made effortless",
+  "name": "Gifted - Gifting, made effortless",
   "short_name": "Gifted",
   "icons": [
     {
@@ -15,7 +15,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#303030",
-  "background_color": "#161616",
+  "theme_color": "#252525",
+  "background_color": "#0c0c0c",
   "display": "standalone"
 }

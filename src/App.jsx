@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import GiftedLight from "./Icons/GiftedLight.png";
+import GiftedLight from "./Icons/GiftedLight.svg";
 import GiftedLogo from "./Icons/GiftedLogo.png";
 import langEnFlag from "./Icons/USAFlag.png";
 import langHeFlag from "./Icons/IsraelFlag.png";
-import { hobbyTitleSubtitle, LOCALE_STORAGE_KEY, makeT } from "./i18n/index.js";
+import { hobbyTitleSubtitle, makeT } from "./i18n/index.js";
 import {
   buildPickContext,
   CURRENCIES,
@@ -803,24 +803,7 @@ export default function App() {
   const [openingGiftId, setOpeningGiftId] = useState(null);
   const [wantThisErrorByGiftId, setWantThisErrorByGiftId] = useState({});
 
-  const [locale, setLocale] = useState(() => {
-    if (typeof window === "undefined") return "en";
-    try {
-      return window.localStorage.getItem(LOCALE_STORAGE_KEY) === "he"
-        ? "he"
-        : "en";
-    } catch {
-      return "en";
-    }
-  });
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
-    } catch {
-      /* ignore */
-    }
-  }, [locale]);
+  const [locale, setLocale] = useState("en");
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -1878,11 +1861,7 @@ export default function App() {
   }
 
   return (
-    <div
-      className="Shell"
-      id="top"
-      dir={locale === "he" ? "rtl" : "ltr"}
-    >
+    <div className="Shell" id="top" dir={locale === "he" ? "rtl" : "ltr"}>
       <div className="Shell__glow" aria-hidden />
       <header className="Header">
         <button
@@ -2763,6 +2742,44 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="BudgetInputRow">
+                  <label className="FieldLabel" htmlFor="budget-amount">
+                    {t("exact_amount", {
+                      symbol:
+                        CURRENCIES.find((c) => c.code === currency)?.symbol ??
+                        "",
+                    })}
+                  </label>
+                  <input
+                    id="budget-amount"
+                    type="number"
+                    inputMode="decimal"
+                    className="Input BudgetInputRow__input"
+                    min={0}
+                    max={maxDisplay}
+                    step={currency === "ILS" ? 20 : maxDisplay > 5000 ? 25 : 10}
+                    disabled={budgetUnlimited}
+                    value={budgetUnlimited ? "" : budgetAmountText}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setBudgetAmountText(raw);
+                      if (raw === "") return;
+                      const n = Number(raw);
+                      if (!Number.isFinite(n)) return;
+                      setBudgetSlider(
+                        Math.min(maxDisplay, Math.max(0, Math.round(n))),
+                      );
+                    }}
+                    onFocus={() => setIsBudgetAmountEditing(true)}
+                    onBlur={() => {
+                      setIsBudgetAmountEditing(false);
+                      if (budgetUnlimited) return;
+                      if (budgetAmountText !== "") return;
+                      setBudgetAmountText(String(Math.round(budgetInCurrency)));
+                    }}
+                  />
+                </div>
+
                 {!budgetUnlimited && (
                   <>
                     <label className="BudgetUnlimited">
@@ -2836,44 +2853,6 @@ export default function App() {
                     )}
                   </>
                 )}
-
-                <div className="BudgetInputRow">
-                  <label className="FieldLabel" htmlFor="budget-amount">
-                    {t("exact_amount", {
-                      symbol:
-                        CURRENCIES.find((c) => c.code === currency)?.symbol ??
-                        "",
-                    })}
-                  </label>
-                  <input
-                    id="budget-amount"
-                    type="number"
-                    inputMode="decimal"
-                    className="Input BudgetInputRow__input"
-                    min={0}
-                    max={maxDisplay}
-                    step={currency === "ILS" ? 20 : maxDisplay > 5000 ? 25 : 10}
-                    disabled={budgetUnlimited}
-                    value={budgetUnlimited ? "" : budgetAmountText}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      setBudgetAmountText(raw);
-                      if (raw === "") return;
-                      const n = Number(raw);
-                      if (!Number.isFinite(n)) return;
-                      setBudgetSlider(
-                        Math.min(maxDisplay, Math.max(0, Math.round(n))),
-                      );
-                    }}
-                    onFocus={() => setIsBudgetAmountEditing(true)}
-                    onBlur={() => {
-                      setIsBudgetAmountEditing(false);
-                      if (budgetUnlimited) return;
-                      if (budgetAmountText !== "") return;
-                      setBudgetAmountText(String(Math.round(budgetInCurrency)));
-                    }}
-                  />
-                </div>
 
                 {recapParts.length > 0 && recipientId && (
                   <p className="Recap">
