@@ -9,8 +9,12 @@
 
 const DEFAULT_BASE = "https://api.groq.com/openai/v1";
 
-/** Abort hung requests so the UI never waits indefinitely (proxy, dev direct, or local key). */
-const GROQ_FETCH_TIMEOUT_MS = 100_000;
+/**
+ * Must stay **below** Vercel `functions.*.maxDuration` (e.g. 60s for `api/groq.js`).
+ * If the client waits longer than the serverless limit, the function is killed and some
+ * browsers leave the fetch pending indefinitely (no response body, abort never seen).
+ */
+const GROQ_FETCH_TIMEOUT_MS = 52_000;
 
 function fetchWithGroqTimeout(url, init = {}) {
   const controller = new AbortController();
@@ -46,16 +50,12 @@ function apiBase() {
   return import.meta.env.VITE_GROQ_API_BASE?.trim() || DEFAULT_BASE;
 }
 
-/** Same-origin absolute URL for the serverless Groq proxy (respects Vite `base`). */
+/** Same-origin path for the serverless Groq proxy (respects Vite `base`). Keep relative so the browser always targets the deployed origin. */
 function groqProxyUrl() {
   const base = import.meta.env.BASE_URL || "/";
   const root = base.endsWith("/") ? base : `${base}/`;
   const path = `${root}api/groq`.replace(/\/{2,}/g, "/");
-  const rel = path.startsWith("/") ? path : `/${path}`;
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return new URL(rel, `${window.location.origin}/`).href;
-  }
-  return rel;
+  return path.startsWith("/") ? path : `/${path}`;
 }
 
 /**
@@ -67,7 +67,7 @@ async function completeGroqDirect(prompt, options = {}) {
   if (!apiKey) throw new Error("Missing VITE_GROQ_API_KEY");
 
   const model = options.model ?? getGroqModelName();
-  const res = await fetch(`${apiBase()}/chat/completions`, {
+  const res = await fetchWithGroqTimeout(`${apiBase()}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
