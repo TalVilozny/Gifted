@@ -1807,6 +1807,15 @@ h4 {
   background: rgba(201, 162, 39, 0.1);
 }
 
+.HobbyFilter__strip .HobbyFilter__chip--readonly {
+  cursor: default;
+}
+
+.HobbyFilter__strip .HobbyFilter__chip--readonly:hover {
+  border-color: var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .DiyTutorials {
   margin: 0 0 1.25rem;
   padding: 1rem 1.1rem;

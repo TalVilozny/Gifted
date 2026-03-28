@@ -1822,15 +1822,40 @@ export function inferHobbyIdsFromCustomLabels(labels) {
     ) {
       out.push("kids");
     }
+    if (
+      /\b(ceramic|ceramics|pottery|clay|kiln|glazing|stoneware|porcelain)\b/.test(
+        low,
+      )
+    ) {
+      out.push("crafts");
+    }
   }
   return [...new Set(out)];
 }
 
+/**
+ * Words from a hobby label for matching/scoring (Unicode letters & numbers).
+ * @param {string} s
+ * @param {{ minLen?: number }} [opts]
+ * @returns {string[]}
+ */
+export function tokenizeLabelWords(s, opts = {}) {
+  const minLen = opts.minLen ?? 2;
+  const raw = String(s || "").trim().toLowerCase();
+  if (!raw) return [];
+  let parts;
+  try {
+    parts = raw.split(/[^\p{L}\p{N}+]+/u);
+  } catch {
+    parts = raw.split(/[^a-z0-9+]+/i);
+  }
+  const out = parts.map((t) => t.trim()).filter((t) => t.length >= minLen);
+  if (out.length === 0 && raw.length >= minLen) return [raw];
+  return out;
+}
+
 function tokenizePickTerms(s) {
-  return String(s || "")
-    .toLowerCase()
-    .split(/[^a-z0-9+]+/i)
-    .filter((t) => t.length > 2);
+  return tokenizeLabelWords(s, { minLen: 3 });
 }
 
 /**

@@ -3,6 +3,7 @@ import {
   finalizeGiftRow,
   inferHobbyIdsFromCustomLabels,
   sortFinalizedGiftsForDisplay,
+  tokenizeLabelWords,
 } from "../data/giftCatalog.js";
 import {
   completeGroq,
@@ -332,11 +333,13 @@ function enrichVariantTagsForCustomHobbies(rawVariants, customLabels) {
     for (const label of customLabels) {
       const lab = String(label).trim();
       if (!lab) continue;
-      const words = lab
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => w.length > 2);
-      const hit = words.some((w) => blob.includes(w));
+      const low = lab.toLowerCase();
+      const words = tokenizeLabelWords(lab, { minLen: 2 });
+      const hit =
+        blob.includes(low) ||
+        (words.length > 0
+          ? words.some((w) => w.length >= 2 && blob.includes(w))
+          : false);
       if (!hit) {
         tags.push(lab.length > 42 ? `${lab.slice(0, 39)}…` : lab);
       }
@@ -425,6 +428,15 @@ CRITICAL — **Ready-made products** they unwrap:
 - Set "diy": false unless the product is explicitly a commercial kit they assemble at home.
 `;
 
+  const customCoverageSection =
+    (customLabels?.length ?? 0) > 0
+      ? `
+COVERAGE — **User-added custom interests** (honor every string): ${JSON.stringify(customLabels)}.
+- For **each** string in that list, include **at least 2 gift rows** where the variant name, blurb, or tags clearly reflect that interest (synonyms OK; repeat keywords across rows is fine).
+- Put those words (or close synonyms) in "tags" when helpful so filtering matches.
+`
+      : "";
+
   const customOnlySection =
     customOnlyNoMapped && !relaxedCustom
       ? `
@@ -463,11 +475,12 @@ Primary hobby bucket (for theming): ${hobbyKey}
 
 ${budgetInstruction}
 ${preferenceSection}
+${customCoverageSection}
 ${customOnlySection}
 ${excludedSection}
 
 Rules:
-- Return exactly 18 objects in "gifts" (fewer only if impossible—prefer 18).
+- Return **18** objects in "gifts" whenever possible (never fewer than **16** unless the task is truly impossible).
 - Each gift: "stableId" (short slug), "category" (section title), "diy" (boolean), "variants" array with 1–3 items (different price tiers or configurations)—use 2–3 when possible.
 - Each variant: "name", "blurb" (one sentence), "priceUSD" (number), "tags" (2–6 strings).
 - Ideas must feel unique and well-matched—avoid repeating the same product type across rows.

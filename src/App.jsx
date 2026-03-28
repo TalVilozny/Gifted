@@ -12,6 +12,7 @@ import {
   hobbies,
   inferHobbyIdsFromCustomLabels,
   resolveGiftImage,
+  tokenizeLabelWords,
   usdToCurrency,
 } from "./data/giftCatalog.js";
 import {
@@ -176,13 +177,17 @@ function giftMatchesCustomHobbyFilter(gift, customLabel, selectedHobbyIds) {
   const needle = String(customLabel).toLowerCase();
   const hay = giftSearchTextForHobbyFilter(gift);
   if (needle && hay.includes(needle)) return true;
-  const tokens = needle
-    .split(/[^a-z0-9+]+/i)
-    .map((t) => t.trim())
-    .filter((t) => t.length >= 3);
-  const hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
+  const tokens = tokenizeLabelWords(customLabel, { minLen: 2 }).filter(
+    (t) => t.length >= 2,
+  );
+  let hayWords;
+  try {
+    hayWords = hay.split(/[^\p{L}\p{N}+]+/u).filter((w) => w.length >= 2);
+  } catch {
+    hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
+  }
   for (const tok of tokens) {
-    if (hay.includes(tok)) return true;
+    if (tok.length >= 2 && hay.includes(tok)) return true;
     const ts = stemForHobbyToken(tok);
     if (!ts) continue;
     if (
@@ -1140,6 +1145,38 @@ export default function App() {
       .map((id) => hobbies.find((h) => h.id === id)?.title)
       .filter(Boolean);
 
+    const catalogRec = getRecommendations({
+      selectedHobbyIds,
+      customLabels: customHobbies,
+      gender,
+      budgetUSD: recommendationBudgetUsd,
+      minBudgetUSD: recommendationMinBudgetUsd,
+      wantDIY: giftPref === "diy",
+      giftPreference: giftPref,
+      budgetUnlimited,
+    });
+    const catalogExcluded = applyDislikeExclusions({
+      ...catalogRec,
+      source: "catalog",
+    });
+
+    function mergeGiftsToMinimum(recIn, filler, minCount) {
+      if (!recIn?.gifts?.length) return recIn;
+      if (recIn.gifts.length >= minCount) return recIn;
+      const seen = new Set(recIn.gifts.map((g) => g.id));
+      const merged = [...recIn.gifts];
+      for (const g of filler.gifts ?? []) {
+        if (merged.length >= minCount) break;
+        if (!seen.has(g.id)) {
+          seen.add(g.id);
+          merged.push(g);
+        }
+      }
+      return { ...recIn, gifts: merged };
+    }
+
+    const MIN_SUGGESTIONS = 4;
+
     let rec = null;
 
     const groqParams = {
@@ -1160,26 +1197,28 @@ export default function App() {
 
     if (groqReady) {
       let ai = null;
+      const useRelaxedFirst = customHobbies.length > 0;
       try {
         ai = await generateGiftIdeasWithGroq({
           ...groqParams,
-          relaxedCustom: false,
+          relaxedCustom: useRelaxedFirst,
         });
       } catch {
         /* fall through */
       }
       const lowYield =
         !ai?.gifts?.length ||
-        (customHobbies.length > 0 && ai.gifts.length < 12);
+        ai.gifts.length < MIN_SUGGESTIONS ||
+        (customHobbies.length > 0 && ai.gifts.length < 16);
       if (lowYield) {
         try {
           const ai2 = await generateGiftIdeasWithGroq({
             ...groqParams,
-            relaxedCustom: true,
+            relaxedCustom: !useRelaxedFirst,
           });
           if (
             ai2?.gifts?.length &&
-            (!ai?.gifts?.length || ai2.gifts.length >= ai.gifts.length)
+            (!ai?.gifts?.length || ai2.gifts.length > (ai?.gifts?.length ?? 0))
           ) {
             ai = ai2;
           }
@@ -1197,17 +1236,7 @@ export default function App() {
     }
 
     if (!rec?.gifts?.length) {
-      const catalogRec = getRecommendations({
-        selectedHobbyIds,
-        customLabels: customHobbies,
-        gender,
-        budgetUSD: recommendationBudgetUsd,
-        minBudgetUSD: recommendationMinBudgetUsd,
-        wantDIY: giftPref === "diy",
-        giftPreference: giftPref,
-        budgetUnlimited,
-      });
-      rec = applyDislikeExclusions({ ...catalogRec, source: "catalog" });
+      rec = catalogExcluded;
 
       if (groqReady && rec.gifts.length > 0) {
         try {
@@ -1242,6 +1271,7 @@ export default function App() {
       }
     }
 
+    rec = mergeGiftsToMinimum(rec, catalogExcluded, MIN_SUGGESTIONS);
     return rec;
   }
 
@@ -1557,12 +1587,9 @@ export default function App() {
     const customNeedle =
       customFilterLabel != null ? customFilterLabel.toLowerCase() : null;
     const customTokens =
-      customNeedle == null
+      customFilterLabel == null
         ? []
-        : customNeedle
-            .split(/[^a-z0-9+]+/i)
-            .map((t) => t.trim())
-            .filter((t) => t.length >= 3);
+        : tokenizeLabelWords(customFilterLabel, { minLen: 2 });
     const inferredCustomIds =
       customFilterLabel == null
         ? []
@@ -1576,7 +1603,12 @@ export default function App() {
     const customScoreForGift = (g) => {
       if (customNeedle == null) return 0;
       const hay = giftSearchTextForHobbyFilter(g);
-      const hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
+      let hayWords;
+      try {
+        hayWords = hay.split(/[^\p{L}\p{N}+]+/u).filter((w) => w.length >= 2);
+      } catch {
+        hayWords = hay.split(/[^a-z0-9+]+/i).filter((w) => w.length >= 3);
+      }
       let score = 0;
       if (hay.includes(customNeedle)) score += 20;
       if (customTokens.length > 0) {
@@ -1625,9 +1657,7 @@ export default function App() {
         .map((x) => x.g)
         .slice(0, 8);
       if (closest.length > 0) return closest;
-      if (selectedHobbyIds.length === 0 && customHobbies.length > 0) {
-        return available;
-      }
+      return available;
     }
     return filtered;
   }, [
@@ -2969,25 +2999,15 @@ export default function App() {
                 {chosenHobbyFilterOptions.length > 0 && (
                   <div className="HobbyFilter">
                     <p className="HobbyFilter__label">{t("hobbies_chose")}</p>
-                    <div className="ChipStrip HobbyFilter__strip">
-                      <button
-                        type="button"
-                        className={`Chip HobbyFilter__chip${activeHobbyFilterId == null ? " HobbyFilter__chip--active" : ""}`}
-                        aria-pressed={activeHobbyFilterId == null}
-                        onClick={() => setActiveHobbyFilterId(null)}
-                      >
-                        {t("filter_all")}
-                      </button>
+                    <div className="ChipStrip HobbyFilter__strip" role="list">
                       {chosenHobbyFilterOptions.map((h) => (
-                        <button
+                        <span
                           key={h.id}
-                          type="button"
-                          className={`Chip HobbyFilter__chip${activeHobbyFilterId === h.id ? " HobbyFilter__chip--active" : ""}`}
-                          aria-pressed={activeHobbyFilterId === h.id}
-                          onClick={() => setActiveHobbyFilterId(h.id)}
+                          className="Chip HobbyFilter__chip HobbyFilter__chip--readonly"
+                          role="listitem"
                         >
                           {h.emoji} {h.title}
-                        </button>
+                        </span>
                       ))}
                     </div>
                   </div>
