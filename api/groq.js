@@ -134,6 +134,17 @@ export default async function handler(req, res) {
     sendJson(res, 200, { content });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Groq request failed";
-    sendJson(res, 502, { error: msg });
+    const upstream =
+      typeof e?.statusCode === "number" ? e.statusCode : null;
+    const status =
+      upstream === 429
+        ? 429
+        : upstream === 401 || upstream === 403
+          ? upstream
+          : 502;
+    if (upstream) {
+      res.setHeader("X-GiftPicker-AI-Upstream-Status", String(upstream));
+    }
+    sendJson(res, status, { error: msg });
   }
 }
