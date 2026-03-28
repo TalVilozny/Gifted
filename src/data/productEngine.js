@@ -136,8 +136,7 @@ export function selectVariantPool(variants, budgetCap, minBudgetUSD = 0) {
   if (isUnlimitedBudget(budgetCap)) {
     const above = variants.filter((v) => v.priceUSD >= min);
     if (above.length) return above;
-    if (min > 0) return [];
-    return variants;
+    return variants.length ? variants : [];
   }
   const inRange = variants.filter(
     (v) => v.priceUSD >= min && v.priceUSD <= budgetCap,
@@ -146,8 +145,9 @@ export function selectVariantPool(variants, budgetCap, minBudgetUSD = 0) {
   // At or above minimum, even if over cap (card may show as above budget).
   const atLeastMin = variants.filter((v) => v.priceUSD >= min);
   if (atLeastMin.length) return atLeastMin;
-  if (min > 0) {
-    return [];
+  // Nothing meets the price floor — still return a pool so rows are not dropped entirely.
+  if (min > 0 && variants.length) {
+    return [...variants].sort((a, b) => b.priceUSD - a.priceUSD);
   }
   const underCap = variants.filter((v) => v.priceUSD <= budgetCap);
   if (underCap.length) return underCap;

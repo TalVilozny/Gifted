@@ -431,9 +431,10 @@ CRITICAL — **Ready-made products** they unwrap:
   const customCoverageSection =
     (customLabels?.length ?? 0) > 0
       ? `
-COVERAGE — **User-added custom interests** (honor every string): ${JSON.stringify(customLabels)}.
-- For **each** string in that list, include **at least 2 gift rows** where the variant name, blurb, or tags clearly reflect that interest (synonyms OK; repeat keywords across rows is fine).
-- Put those words (or close synonyms) in "tags" when helpful so filtering matches.
+COVERAGE — **User-added custom interests** (mandatory; honor every string): ${JSON.stringify(customLabels)}.
+- For **each** string, include **at least 2 gift rows** where the variant name, blurb, or tags clearly reflect that interest (synonyms OK; repeat keywords is fine).
+- Examples: "Sim racing" → racing wheel, pedals, cockpit/frame, direct-drive wheel base; include tags like "sim racing", "racing wheel", or words from the user’s string.
+- Do **not** output a curation where **none** of the ideas relate to these custom strings when they are listed alongside presets—the custom text must appear across several rows.
 `
       : "";
 

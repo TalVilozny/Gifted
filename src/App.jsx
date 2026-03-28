@@ -83,7 +83,47 @@ function dropGiftsBelowMinBudget(rec, minUsd, budgetUnlimited) {
     return Number.isFinite(p) && p >= minUsd - 0.01;
   });
   if (kept.length === rec.gifts.length) return rec;
-  return { ...rec, gifts: kept };
+  const MIN = 3;
+  if (kept.length === 0) return rec;
+  if (kept.length >= MIN) return { ...rec, gifts: kept };
+  const below = rec.gifts.filter((g) => !kept.includes(g));
+  const sortedBelow = [...below].sort(
+    (a, b) =>
+      Number(b.selectedProduct?.priceUSD) - Number(a.selectedProduct?.priceUSD),
+  );
+  const pad = [...kept];
+  for (const g of sortedBelow) {
+    if (pad.length >= MIN) break;
+    pad.push(g);
+  }
+  return { ...rec, gifts: pad };
+}
+
+/** Dedup by id; fill from filler until at least minCount (used for AI + catalog merge). */
+function mergeGiftListsInto(primary, filler, minCount, sourceFallback = "catalog") {
+  const base = primary?.gifts?.length ? [...primary.gifts] : [];
+  const seen = new Set(base.map((g) => g.id));
+  const out = [...base];
+  for (const g of filler?.gifts ?? []) {
+    if (out.length >= minCount) break;
+    if (!seen.has(g.id)) {
+      seen.add(g.id);
+      out.push(g);
+    }
+  }
+  const hasPrimary = primary?.gifts?.length > 0;
+  if (hasPrimary) {
+    return { ...primary, gifts: out };
+  }
+  return { ...filler, gifts: out, source: filler?.source ?? sourceFallback };
+}
+
+const MIN_RESULT_GIFTS = 3;
+
+function padResultToMinimumGifts(rec, minCount, catalogParams) {
+  if (rec?.gifts?.length >= minCount) return rec;
+  const filler = { ...getRecommendations(catalogParams), source: "catalog" };
+  return mergeGiftListsInto(rec, filler, minCount, "catalog");
 }
 
 function Stars({ value, max = 5, ariaLabel }) {
@@ -1160,22 +1200,7 @@ export default function App() {
       source: "catalog",
     });
 
-    function mergeGiftsToMinimum(recIn, filler, minCount) {
-      if (!recIn?.gifts?.length) return recIn;
-      if (recIn.gifts.length >= minCount) return recIn;
-      const seen = new Set(recIn.gifts.map((g) => g.id));
-      const merged = [...recIn.gifts];
-      for (const g of filler.gifts ?? []) {
-        if (merged.length >= minCount) break;
-        if (!seen.has(g.id)) {
-          seen.add(g.id);
-          merged.push(g);
-        }
-      }
-      return { ...recIn, gifts: merged };
-    }
-
-    const MIN_SUGGESTIONS = 4;
+    const MIN_SUGGESTIONS = 3;
 
     let rec = null;
 
@@ -1271,7 +1296,7 @@ export default function App() {
       }
     }
 
-    rec = mergeGiftsToMinimum(rec, catalogExcluded, MIN_SUGGESTIONS);
+    rec = mergeGiftListsInto(rec, catalogExcluded, MIN_SUGGESTIONS, "groq");
     return rec;
   }
 
@@ -1304,6 +1329,16 @@ export default function App() {
       recommendationMinBudgetUsd,
       budgetUnlimited,
     );
+    priced = padResultToMinimumGifts(priced, MIN_RESULT_GIFTS, {
+      selectedHobbyIds,
+      customLabels: customHobbies,
+      gender,
+      budgetUSD: recommendationBudgetUsd,
+      minBudgetUSD: recommendationMinBudgetUsd,
+      wantDIY: giftPref === "diy",
+      giftPreference: giftPref,
+      budgetUnlimited,
+    });
     setResult(priced);
     if (giftPref === "diy") {
       setDiyTutorialIds((prev) =>
@@ -1338,6 +1373,16 @@ export default function App() {
         recommendationMinBudgetUsd,
         budgetUnlimited,
       );
+      priced = padResultToMinimumGifts(priced, MIN_RESULT_GIFTS, {
+        selectedHobbyIds,
+        customLabels: customHobbies,
+        gender,
+        budgetUSD: recommendationBudgetUsd,
+        minBudgetUSD: recommendationMinBudgetUsd,
+        wantDIY: giftPref === "diy",
+        giftPreference: giftPref,
+        budgetUnlimited,
+      });
       setResult(priced);
       if (giftPref === "diy") {
         setDiyTutorialIds((prev) =>

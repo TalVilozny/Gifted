@@ -1788,6 +1788,9 @@ export function inferHobbyIdsFromCustomLabels(labels) {
     if (
       /\b(sim\s*racing|simracing|racing\s*sim|driving\s*sim|wheelbase|force\s*feedback|pedal\s*set|cockpit|bucket\s*seat|assetto|i\s*racing|iracing|gran\s*turismo|f1\s*sim)\b/.test(
         low,
+      ) ||
+      /sim[-\s]?racing|simracing|racing[-\s]?sim|direct[-\s]?drive|fanatec|thrustmaster|moza\s*racing|logitech\s*g\s*pro/i.test(
+        low,
       )
     ) {
       out.push("cars");
@@ -1985,9 +1988,23 @@ export function finalizeGiftRow(
   const expanded = expandGiftRow(g);
   const cap = budgetUnlimited ? Infinity : budgetUSD;
   const min = budgetUnlimited ? 0 : Math.max(0, Number(minBudgetUSD) || 0);
-  const selected = pickContext?.groups?.length
+  let selected = pickContext?.groups?.length
     ? pickBestVariantForBudgetScored(expanded.variants, cap, pickContext, min)
     : pickBestVariantForBudget(expanded.variants, cap, min);
+  if (!selected) {
+    selected = pickBestVariantForBudgetScored(
+      expanded.variants,
+      cap,
+      pickContext,
+      0,
+    );
+  }
+  if (!selected) {
+    selected = pickBestVariantForBudget(expanded.variants, cap, 0);
+  }
+  if (!selected && expanded.variants?.length) {
+    selected = expanded.variants[0];
+  }
   if (!selected) {
     return null;
   }
