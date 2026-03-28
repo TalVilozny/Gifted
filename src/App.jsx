@@ -9,9 +9,11 @@ import {
   CURRENCIES,
   DEFAULT_GIFT_IMAGE_URL,
   getRecommendations,
+  giftFitsBudgetWindow,
   hobbies,
   inferHobbyIdsFromCustomLabels,
   resolveGiftImage,
+  sortFinalizedGiftsForDisplay,
   tokenizeLabelWords,
   usdToCurrency,
 } from "./data/giftCatalog.js";
@@ -1269,8 +1271,10 @@ export default function App() {
             gifts: rec.gifts,
             hobbyTitles,
             customLabels: customHobbies,
+            selectedHobbyIds,
             gender,
             budgetUSD: budgetUnlimited ? null : recommendationBudgetUsd,
+            minBudgetUSD: recommendationMinBudgetUsd,
             wantDIY: giftPref === "diy",
             giftPreference: giftPref,
             budgetUnlimited,
@@ -1297,6 +1301,23 @@ export default function App() {
     }
 
     rec = mergeGiftListsInto(rec, catalogExcluded, MIN_SUGGESTIONS, "groq");
+    if (rec?.gifts?.length) {
+      const sorted = sortFinalizedGiftsForDisplay(
+        rec.gifts,
+        recommendationBudgetUsd,
+        budgetUnlimited,
+        buildPickContext(selectedHobbyIds, customHobbies),
+        recommendationMinBudgetUsd,
+      );
+      rec = {
+        ...rec,
+        gifts: sorted,
+        mode:
+          budgetUnlimited || sorted.some((g) => g._inBudget) ? "in" : "stretch",
+      };
+    } else {
+      rec = { ...rec, mode: "stretch" };
+    }
     return rec;
   }
 
@@ -1339,6 +1360,21 @@ export default function App() {
       giftPreference: giftPref,
       budgetUnlimited,
     });
+    if (priced?.gifts?.length) {
+      const sorted = sortFinalizedGiftsForDisplay(
+        priced.gifts,
+        recommendationBudgetUsd,
+        budgetUnlimited,
+        giftPickContext,
+        recommendationMinBudgetUsd,
+      );
+      priced = {
+        ...priced,
+        gifts: sorted,
+        mode:
+          budgetUnlimited || sorted.some((g) => g._inBudget) ? "in" : "stretch",
+      };
+    }
     setResult(priced);
     if (giftPref === "diy") {
       setDiyTutorialIds((prev) =>
@@ -1383,6 +1419,23 @@ export default function App() {
         giftPreference: giftPref,
         budgetUnlimited,
       });
+      if (priced?.gifts?.length) {
+        const sorted = sortFinalizedGiftsForDisplay(
+          priced.gifts,
+          recommendationBudgetUsd,
+          budgetUnlimited,
+          giftPickContext,
+          recommendationMinBudgetUsd,
+        );
+        priced = {
+          ...priced,
+          gifts: sorted,
+          mode:
+            budgetUnlimited || sorted.some((g) => g._inBudget)
+              ? "in"
+              : "stretch",
+        };
+      }
       setResult(priced);
       if (giftPref === "diy") {
         setDiyTutorialIds((prev) =>
@@ -3217,7 +3270,14 @@ export default function App() {
                       : product.priceUSD;
                     const priceLocal = usdToCurrency(giftTotalUsd, currency);
                     const eachLocal = usdToCurrency(product.priceUSD, currency);
-                    const top = index === 0;
+                    const showTopPickRibbon =
+                      index === 0 &&
+                      giftFitsBudgetWindow(
+                        gift,
+                        recommendationBudgetUsd,
+                        budgetUnlimited,
+                        recommendationMinBudgetUsd,
+                      );
                     // When Pexels isn't configured, avoid the catalog's illustrative images
                     // (they can be mismatched). When it is configured, Pexels will replace
                     // the fallback quickly anyway.
@@ -3251,10 +3311,10 @@ export default function App() {
                     return (
                       <li
                         key={gift.id}
-                        className={`GiftCard${top ? " GiftCard--top" : ""}${refining ? " GiftCard--refining" : ""}`}
+                        className={`GiftCard${showTopPickRibbon ? " GiftCard--top" : ""}${refining ? " GiftCard--refining" : ""}`}
                       >
                         <div className="GiftCard__media">
-                          {top && (
+                          {showTopPickRibbon && (
                             <div className="GiftCard__ribbon">
                               {t("top_pick")}
                             </div>

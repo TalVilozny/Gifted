@@ -179,8 +179,10 @@ function formatRecipientMeta(recipientId, recipientAgeRange, recipientGroupSize 
  *   gifts: object[],
  *   hobbyTitles: string[],
  *   customLabels: string[],
+ *   selectedHobbyIds?: string[],
  *   gender: string,
  *   budgetUSD: number | null,
+ *   minBudgetUSD?: number,
  *   wantDIY?: boolean,
  *   giftPreference?: 'diy' | 'experience' | 'premade',
  *   budgetUnlimited?: boolean,
@@ -193,8 +195,10 @@ export async function rankGiftsWithGroq({
   gifts,
   hobbyTitles,
   customLabels,
+  selectedHobbyIds = [],
   gender,
   budgetUSD,
+  minBudgetUSD = 0,
   wantDIY = false,
   giftPreference = null,
   budgetUnlimited = false,
@@ -281,8 +285,8 @@ Reorder the gift options from **best overall fit** to weaker fit for ${reorderTa
 
 Priorities (in order):
 1) **Hobby fit** — stronger match to the listed interests; **prefer** items that clearly touch **two or more** interests when that is genuine (not forced).
-2) **Budget** — respect the soft budget: favor in-budget picks when quality of match is similar; do not put wildly over-budget items above strong in-budget matches.
-3) **Ratings** — when (1) and (2) are close, favor higher customer ratings.
+2) **Budget** — list **every** gift with price at or under the soft budget **before** any gift priced above it (in-budget ideas must come first in orderedIds).
+3) **Ratings** — when (1) and (2) are close, favor higher customer ratings among same-tier items.
 
 Guidance:
 - Prefer **variety**: do not rank five similar small accessories at the top when the list includes bigger or more distinctive gifts for the same hobby.
@@ -314,8 +318,16 @@ ${JSON.stringify(options, null, 2)}`;
   for (const g of pool) {
     if (!seen.has(g.id)) ordered.push(g);
   }
+  const pickCtx = buildPickContext(selectedHobbyIds, customLabels);
+  const sorted = sortFinalizedGiftsForDisplay(
+    ordered,
+    budgetUSD ?? 0,
+    budgetUnlimited,
+    pickCtx,
+    minBudgetUSD,
+  );
   return {
-    gifts: ordered,
+    gifts: sorted,
     reason: typeof parsed.shortReason === "string" ? parsed.shortReason : "",
   };
 }
@@ -575,6 +587,7 @@ Return ONLY valid JSON:
       budgetUSD,
       budgetUnlimited,
       pickContext,
+      minUsd,
     ),
     intro,
   };
@@ -725,14 +738,13 @@ export async function enrichResultWithRetailPriceEstimates(
         );
       })
       .filter(Boolean);
-    const sorted = pickContext?.groups?.length
-      ? sortFinalizedGiftsForDisplay(
-          nextGifts,
-          recommendationBudgetUsd,
-          budgetUnlimited,
-          pickContext,
-        )
-      : nextGifts;
+    const sorted = sortFinalizedGiftsForDisplay(
+      nextGifts,
+      recommendationBudgetUsd,
+      budgetUnlimited,
+      pickContext,
+      minUsd,
+    );
     return { ...rec, gifts: sorted };
   } catch {
     return rec;

@@ -2140,20 +2140,51 @@ export function getRecommendations({
     }
   }
 
-  const fits = finalized.filter((f) => f._inBudget);
-  const pool = fits.length ? fits : finalized;
   const sorted = sortGiftsByBudgetFit(
-    pool,
+    finalized,
     budgetUSD,
     budgetUnlimited,
     pickContext,
+    minBudgetUSD,
   );
 
-  const mode = fits.length ? "in" : "stretch";
+  const mode = budgetUnlimited
+    ? "in"
+    : sorted.some((f) => f._inBudget)
+      ? "in"
+      : "stretch";
   return { gifts: sorted.slice(0, MAX_RESULTS), mode };
 }
 
 const LIST_MIN_OK_RATING = 3.6;
+
+/** 0 = within min–max window, 1 = below min, 2 = above soft budget (shown last). */
+export function giftBudgetSortTier(
+  g,
+  budgetUSD,
+  budgetUnlimited,
+  minBudgetUSD = 0,
+) {
+  if (budgetUnlimited) return 0;
+  const min = Math.max(0, Number(minBudgetUSD) || 0);
+  const cap = Number(budgetUSD);
+  const p = Number(g.selectedProduct?.priceUSD);
+  if (!Number.isFinite(p)) return 2;
+  if (!Number.isFinite(cap) || cap < 0) return 0;
+  if (p > cap + 0.01) return 2;
+  if (min > 0 && p < min - 0.01) return 1;
+  return 0;
+}
+
+/** True if this row should qualify as an “in budget” top pick (not unlimited). */
+export function giftFitsBudgetWindow(
+  g,
+  budgetUSD,
+  budgetUnlimited,
+  minBudgetUSD = 0,
+) {
+  return giftBudgetSortTier(g, budgetUSD, budgetUnlimited, minBudgetUSD) === 0;
+}
 
 function multiHobbyHayBonus(hay, pickContext) {
   if (!pickContext?.groups?.length) return 0;
@@ -2170,7 +2201,17 @@ function multiHobbyHayBonus(hay, pickContext) {
   return mh;
 }
 
-function scoreFinalizedGiftRow(g, budgetUSD, budgetUnlimited, pickContext) {
+/**
+ * Within the same budget tier: prefer stronger hobby overlap, then rating, then
+ * sensible price (use budget when in window).
+ */
+function scoreForGiftOrder(
+  g,
+  pickContext,
+  budgetUSD,
+  budgetUnlimited,
+  tier,
+) {
   const p = g.selectedProduct;
   const hay =
     `${g.categoryTitle || ""} ${p.name} ${p.blurb || ""}`.toLowerCase();
@@ -2180,15 +2221,15 @@ function scoreFinalizedGiftRow(g, budgetUSD, budgetUnlimited, pickContext) {
   if (r < 3.5) ratingPenalty = 48;
   else if (r < LIST_MIN_OK_RATING) ratingPenalty = 16;
 
-  if (budgetUnlimited) {
-    return mh + p.priceUSD * 0.00015 + r * 2.2 - ratingPenalty;
+  if (tier === 0 && budgetUnlimited) {
+    return mh * 3 + r * 52 + p.priceUSD * 0.0001 - ratingPenalty;
   }
-
-  const cap = Math.max(budgetUSD, 1);
-  const ua = Math.min(1, p.priceUSD / cap);
-  const inB = p.priceUSD <= budgetUSD ? 1 : 0;
-  const base = r * (0.35 + 0.65 * ua) + (inB ? 9 : -14);
-  return base + mh - ratingPenalty;
+  if (tier === 0 && !budgetUnlimited && budgetUSD > 0) {
+    const cap = Math.max(budgetUSD, 1);
+    const ratio = Math.min(1, p.priceUSD / cap);
+    return mh * 3 + r * 52 + ratio * 10 - ratingPenalty;
+  }
+  return mh * 3 + r * 52 - ratingPenalty;
 }
 
 /**
@@ -2196,25 +2237,32 @@ function scoreFinalizedGiftRow(g, budgetUSD, budgetUnlimited, pickContext) {
  * @param {number} budgetUSD
  * @param {boolean} budgetUnlimited
  * @param {{ groups?: { terms: string[] }[] } | null} [pickContext]
+ * @param {number} [minBudgetUSD]
  */
 function sortGiftsByBudgetFit(
   pool,
   budgetUSD,
   budgetUnlimited,
   pickContext = null,
+  minBudgetUSD = 0,
 ) {
   return [...pool].sort((a, b) => {
-    const sa = scoreFinalizedGiftRow(
+    const ta = giftBudgetSortTier(a, budgetUSD, budgetUnlimited, minBudgetUSD);
+    const tb = giftBudgetSortTier(b, budgetUSD, budgetUnlimited, minBudgetUSD);
+    if (ta !== tb) return ta - tb;
+    const sa = scoreForGiftOrder(
       a,
+      pickContext,
       budgetUSD,
       budgetUnlimited,
-      pickContext,
+      ta,
     );
-    const sb = scoreFinalizedGiftRow(
+    const sb = scoreForGiftOrder(
       b,
+      pickContext,
       budgetUSD,
       budgetUnlimited,
-      pickContext,
+      tb,
     );
     if (sb !== sa) return sb - sa;
     const ra = Number(a.selectedProduct.rating) || 0;
@@ -2223,22 +2271,28 @@ function sortGiftsByBudgetFit(
     const pa = a.selectedProduct.priceUSD;
     const pb = b.selectedProduct.priceUSD;
     if (budgetUnlimited) return pb - pa;
-    const ia = pa <= budgetUSD ? 1 : 0;
-    const ib = pb <= budgetUSD ? 1 : 0;
-    if (ib !== ia) return ib - ia;
-    if (ia) return pb - pa;
-    return pa - pb;
+    if (ta === 2) return pa - pb;
+    if (ta === 0) return pb - pa;
+    return pb - pa;
   });
 }
 
 /**
  * Deterministic ordering for finalized rows (e.g. pure-Groq lists before enrichment).
+ * In-budget (and in-window) rows always come first; above soft budget last.
  */
 export function sortFinalizedGiftsForDisplay(
   gifts,
   budgetUSD,
   budgetUnlimited,
   pickContext,
+  minBudgetUSD = 0,
 ) {
-  return sortGiftsByBudgetFit(gifts, budgetUSD, budgetUnlimited, pickContext);
+  return sortGiftsByBudgetFit(
+    gifts,
+    budgetUSD,
+    budgetUnlimited,
+    pickContext,
+    minBudgetUSD,
+  );
 }
