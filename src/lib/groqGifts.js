@@ -79,6 +79,48 @@ function slugId(s) {
   return t || "idea";
 }
 
+/** Interests that legitimately include dining/spa/travel gift cards. */
+function interestsSoundFoodSpaOrTravel(customLabels) {
+  const blob = (customLabels || []).join(" ").toLowerCase();
+  return /\b(food|wine|dine|dining|restaurant|chef|gourmet|cooking|eat|brunch|coffee|tea|spa|wellness|massage|facial|travel|hotel|vacation|getaway|trip|resort)\b/.test(
+    blob,
+  );
+}
+
+/**
+ * Drop AI rows that are generic dining/spa “experience gift card” fillers when the
+ * user asked for physical gifts (or DIY) and their interests are hobby/tech-focused.
+ */
+function shouldDropLazyExperienceGiftCardRow(item, giftPreference, customLabels) {
+  if (giftPreference === "experience") return false;
+  const vars = Array.isArray(item?.variants) ? item.variants : [];
+  const text = [
+    item?.category,
+    item?.stableId,
+    ...vars.map((v) => `${v?.name ?? ""} ${v?.blurb ?? ""}`),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!/\b(gift\s*card|e-?gift|gift\s*voucher)\b/.test(text)) return false;
+  if (
+    /\b(steam|playstation|ps5|xbox|nintendo|switch|epic\s*games|battlenet|fanatec|iracing|assetto|sim\s*racing)\b/.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  if (interestsSoundFoodSpaOrTravel(customLabels)) return false;
+  if (
+    /\b(experience\s+gift\s+card|dining|spa|restaurant|hotel|travel|getaway|local\s+dining|wine\s+tasting|visa|mastercard|amex)\b/.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Keep model-estimated prices in a sane range vs. the user’s soft budget.
  * @param {number} [minBudgetUSD=0] when &gt; 0, never clamp below this (honors minimum-budget).
@@ -425,7 +467,7 @@ export async function generateGiftIdeasWithGroq({
 CRITICAL — **Handmade & personal** (NOT mainly PC/electronics toolkits):
 - The user wants **gifts they create or deeply personalize**: origami, custom bouquets, love letters / calligraphy, scrapbooks, memory boxes, candle-making, soap-making for beginners, watercolor for cards, couples’ workshops to make something together, etc.
 - Include **sentimental, tactile, paper/floral/letter** angles. Electronics soldering / PC building **at most 1–2 ideas** if hobbies demand it.
-- At least 14 of 18 rows must be clearly handmade/personal-DIY. Set "diy": true on those rows.
+- **Do not** suggest generic dining/spa/travel **gift cards**—those are not handmade DIY. At least 14 of 18 rows must be clearly handmade/personal-DIY. Set "diy": true on those rows.
 `
       : pref === "experience"
         ? `
@@ -437,6 +479,8 @@ CRITICAL — **Experiences & memories** (things they *do*):
         : `
 CRITICAL — **Ready-made products** they unwrap:
 - Prioritize **finished, shippable gifts**: gear, accessories, decor, consumables, boxed sets—not open-ended “plan a trip” unless paired with a concrete voucher or pass product.
+- **Do not** use generic **dining / spa / hotel / travel “experience gift card”** rows as filler. Those are **forbidden** unless the user’s interests explicitly mention food, wine, dining, spa, wellness, travel, or hotels.
+- For **sim racing, gaming, PC, cars, music, crafts, fitness, photography**, etc.: suggest **concrete hardware or gear** (e.g. wheel base, pedals, cockpit, GPU, games, tools)—not multi-venue gift cards.
 - Set "diy": false unless the product is explicitly a commercial kit they assemble at home.
 `;
 
@@ -446,6 +490,7 @@ CRITICAL — **Ready-made products** they unwrap:
 COVERAGE — **User-added custom interests** (mandatory; honor every string): ${JSON.stringify(customLabels)}.
 - For **each** string, include **at least 2 gift rows** where the variant name, blurb, or tags clearly reflect that interest (synonyms OK; repeat keywords is fine).
 - Examples: "Sim racing" → racing wheel, pedals, cockpit/frame, direct-drive wheel base; include tags like "sim racing", "racing wheel", or words from the user’s string.
+- **Never** substitute a generic dining/spa/travel **gift card** for a hobby that calls for **gear or equipment** (sim racing, gaming, music, sports, crafts, tech, etc.).
 - Do **not** output a curation where **none** of the ideas relate to these custom strings when they are listed alongside presets—the custom text must appear across several rows.
 `
       : "";
@@ -497,6 +542,7 @@ Rules:
 - Each gift: "stableId" (short slug), "category" (section title), "diy" (boolean), "variants" array with 1–3 items (different price tiers or configurations)—use 2–3 when possible.
 - Each variant: "name", "blurb" (one sentence), "priceUSD" (number), "tags" (2–6 strings).
 - Ideas must feel unique and well-matched—avoid repeating the same product type across rows.
+- **Banned (unless interests are food/wine/dining/spa/travel):** rows whose main idea is a generic **experience / dining / spa / hotel gift card** or open-ended cash card. Use **specific products** instead.
 - When several interests are listed, include **several** ideas that intentionally **blend two or more** of them (e.g. gaming + music, coffee + reading), not only single-hobby items.
 
 Return ONLY valid JSON:
@@ -522,12 +568,17 @@ Return ONLY valid JSON:
   const rawList = parsed.gifts;
   if (!Array.isArray(rawList) || rawList.length === 0) return null;
 
+  const listToUse = rawList.filter(
+    (row) => !shouldDropLazyExperienceGiftCardRow(row, pref, customLabels),
+  );
+  if (listToUse.length === 0) return null;
+
   const intro = typeof parsed.intro === "string" ? parsed.intro : "";
   const pickContext = buildPickContext(selectedHobbyIds, customLabels);
 
   const out = [];
-  for (let i = 0; i < Math.min(rawList.length, MAX_AI_GIFTS); i++) {
-    const item = rawList[i];
+  for (let i = 0; i < Math.min(listToUse.length, MAX_AI_GIFTS); i++) {
+    const item = listToUse[i];
     const vars = Array.isArray(item.variants) ? item.variants : [];
     if (vars.length === 0) continue;
 

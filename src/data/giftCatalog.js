@@ -1631,14 +1631,14 @@ export const giftsByHobby = {
     },
     {
       id: "gen3",
-      name: "Experience gift card (local dining / spa)",
-      blurb: "Let them choose the venue—memories age better than clutter.",
-      priceUSD: 60,
-      rating: 4.9,
+      name: "Compact LED desk lamp (dimmer + USB)",
+      blurb: "Warm-to-cool light for desk work; charges a phone from the base.",
+      priceUSD: 56,
+      rating: 4.8,
       forGender: null,
       reviews: [
-        R("We booked a tasting menu we’d never splurge on.", "Morgan L.", 5),
-        R("Check blackout dates before gifting.", "Casey D.", 4),
+        R("No flicker at low brightness—easy on the eyes.", "Morgan L.", 5),
+        R("Small footprint; arm adjusts without sagging.", "Casey D.", 5),
       ],
     },
     {
