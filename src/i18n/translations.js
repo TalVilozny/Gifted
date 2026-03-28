@@ -158,7 +158,8 @@ const en = {
   thinking_title: "Finding the best fit…",
   thinking_groq:
     "Creating personalized gift ideas and estimating typical prices and ratings",
-  thinking_catalog: "Scoring gifts from our catalog for your hobbies and budget",
+  thinking_catalog:
+    "Scoring gifts from our catalog for your hobbies and budget",
   thinking_in: "in",
 
   results_title: "Your gift ideas",
@@ -206,7 +207,8 @@ const en = {
     "Picks the variant on this card that best matches your note (or keyword matching if smart refine isn’t available).",
   refine_hint_groq_list:
     "Reads your note and chooses the best option from this card’s catalog list.",
-  refine_hint_local: "On-device keyword matching picks a variant from this list.",
+  refine_hint_local:
+    "On-device keyword matching picks a variant from this list.",
   note_prefix: "Note:",
   shop_title: "Shop this product (search)",
   reviews_ai_title: "Buyer-style reviews",
@@ -323,8 +325,7 @@ const he = {
   privacy_p_data:
     "אנו משתמשים בפרטים שמזינים במהלך הסשן — סוג נמען, גיל, תחומי עניין, תקציב ואפשרויות נבחרות — כדי ליצור המלצות.",
   privacy_h_use: "איך זה משמש",
-  privacy_p_use:
-    "ההמלצות נוצרות בסשן בדפדפן. אין צורך בחשבון לחוויית הליבה.",
+  privacy_p_use: "ההמלצות נוצרות בסשן בדפדפן. אין צורך בחשבון לחוויית הליבה.",
   privacy_h_external: "שירותים חיצוניים",
   privacy_p_external:
     "תכונות אופציונליות עשויות לפנות ל-APIs של צד שלישי (למשל בינה מלאכותית או חיפוש תמונות) כשהוגדרו. פרטים בהגדרות הפריסה.",
@@ -332,7 +333,7 @@ const he = {
   privacy_p_retail:
     "קישורי מוצרים פותחים אתרי קמעונאים חיצוניים. איננו אחראים לרשימות, מחירים או מדיניות שלהם.",
   privacy_h_contact: "יצירת קשר",
-  privacy_p_contact: "שאלות? דוא\"ל",
+  privacy_p_contact: 'שאלות? דוא"ל',
 
   step1: "שלב 1",
   who_title: "מתנה לאדם אחד או לקבוצה",
@@ -391,8 +392,7 @@ const he = {
 
   step2: "שלב 2",
   age_title: "בן/בת כמה?",
-  age_lead_base:
-    "הגדירו גיל בשנים — Gifted משתמש בזה לטון ולרעיונות מתנה.",
+  age_lead_base: "הגדירו גיל בשנים — Gifted משתמש בזה לטון ולרעיונות מתנה.",
   age_lead_parents: "הורים: גילאים 20–100.",
   age_lead_partners: "זוגיות: גילאים 15–100.",
   age_lead_kids: "ילדים: גילאים 0–17.",
@@ -413,8 +413,7 @@ const he = {
   add_hobby: "הוספת תחביב",
   add_hobby_ph: "למשל: מכוניות, קרמיקה, שחמט…",
   add_btn: "הוסף",
-  add_hobby_hint:
-    "נכלול גם התאמות מהקטלוג (למשל {cars} → רעיונות רכב).",
+  add_hobby_hint: "נכלול גם התאמות מהקטלוג (למשל {cars} → רעיונות רכב).",
   add_hobby_hint_cars: "מכוניות",
   gift_style: "סגנון מתנה",
   gift_style_intro: "בחרו אחד — נתאים רעיונות לאופן שבו תרצו לתת.",
@@ -438,8 +437,7 @@ const he = {
   endless_strong: "תקציב ללא גבול",
   budget_label: "תקציב",
   no_limit: "ללא הגבלה",
-  min_price_check:
-    "{strong} — ההמלצות יעדיפו מתנות מסכום זה עד למקסימום.",
+  min_price_check: "{strong} — ההמלצות יעדיפו מתנות מסכום זה עד למקסימום.",
   min_price_strong: "קביעת מחיר מינימום למתנה",
   min_gift_price: "מחיר מינימום למתנה",
   exact_amount: "סכום מדויק ({symbol})",
@@ -458,8 +456,7 @@ const he = {
   find_gifts: "מצאו מתנות",
 
   thinking_title: "מוצאים את ההתאמה הטובה ביותר…",
-  thinking_groq:
-    "יוצרים רעיונות מותאמים ומעריכים מחירים ודירוגים",
+  thinking_groq: "יוצרים רעיונות מותאמים ומעריכים מחירים ודירוגים",
   thinking_catalog: "מדרגים מתנות מהקטלוג לפי תחביבים ותקציב",
   thinking_in: "ב־",
 
@@ -475,8 +472,7 @@ const he = {
     "בחרתם „אני רוצה להכין בעצמי” עם תקציב נמוך — הנה מדריכים למתנות בעשייה ידנית.",
   stretch_banner:
     "שום דבר לא נכנס תחת {amount}. אלה ההתאמות הקרובות — שקלו להעלות תקציב.",
-  no_matches_combo:
-    "אין התאמות לשילוב הזה — נסו תחביב אחר או התאימו תקציב.",
+  no_matches_combo: "אין התאמות לשילוב הזה — נסו תחביב אחר או התאימו תקציב.",
   saved_likes: "שמורים",
   total_for_n: 'סה"כ ל־{n} אנשים',
   remove: "הסר",
@@ -497,8 +493,7 @@ const he = {
   each: "לאחד",
   want_finding: "מחפש חנות…",
   want_this: "אני רוצה את זה",
-  want_hint_groq:
-    "פותח חיפוש קניות מותאם לאזור (ניתוב חכם כשזמין).",
+  want_hint_groq: "פותח חיפוש קניות מותאם לאזור (ניתוב חכם כשזמין).",
   want_hint_google: "פותח Google Shopping להשוואת מחירים.",
   show_another: "הצג אפשרות אחרת בקטגוריה זו",
   refine_label: "פירוט נוסף",
@@ -506,21 +501,18 @@ const he = {
   refine_btn: "צמצם",
   refine_hint_groq_cat:
     "בוחר את הווריאנט שמתאים להערה (או התאמת מילות מפתח אם אין שירות חכם).",
-  refine_hint_groq_list:
-    "קורא את ההערה ובוחר את האפשרות הטובה ביותר מהרשימה.",
+  refine_hint_groq_list: "קורא את ההערה ובוחר את האפשרות הטובה ביותר מהרשימה.",
   refine_hint_local: "התאמת מילות מפתח במכשיר בוחרת וריאנט מהרשימה.",
   note_prefix: "הערה:",
   shop_title: "קנו את המוצר (חיפוש)",
   reviews_ai_title: "ביקורות בסגנון קונים",
   reviews_cat_title: "מה שקונים לעתים קרובות אומרים",
-  reviews_ai_disclaimer:
-    "דוגמאות לביקורות — תמיד בדקו בדף המוכר לפני רכישה.",
+  reviews_ai_disclaimer: "דוגמאות לביקורות — תמיד בדקו בדף המוכר לפני רכישה.",
   reviews_cat_disclaimer:
     "תגובות אופייניות לסוג מוצר — בכל חנות יש ביקורות אמיתיות ברשימה.",
 
   case_title: "בוחרים בשבילכם",
-  case_lede:
-    "הרעיונות שסימנתם גוללים מעל הסימון, ואז נעצור על מתנה אחת.",
+  case_lede: "הרעיונות שסימנתם גוללים מעל הסימון, ואז נעצור על מתנה אחת.",
   case_choose: "בחרו בשבילי",
   case_choosing: "בוחר…",
   case_you_should: "כדאי לתת:",
@@ -596,8 +588,7 @@ const he = {
   hobby_kids_sub: "צעצועים, משחקים, יצירתיות ופליאה",
 
   stars_aria: "{value} מתוך {max} כוכבים",
-  popup_blocked:
-    "חלון קופץ נחסם — אפשרו חלונות קופצים לאתר זה ונסו שוב.",
+  popup_blocked: "חלון קופץ נחסם — אפשרו חלונות קופצים לאתר זה ונסו שוב.",
   privacy_contact_lead: "לשאלות פרטיות ניתן לפנות ל־",
 
   refine_err_no_match:

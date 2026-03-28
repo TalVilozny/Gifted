@@ -28,9 +28,7 @@ export function isGroqConfigured() {
 }
 
 export function getGroqModelName() {
-  return (
-    import.meta.env.VITE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile"
-  );
+  return import.meta.env.VITE_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile";
 }
 
 function apiBase() {
@@ -84,8 +82,7 @@ async function completeGroqProxy(prompt, options = {}) {
       model,
       temperature: options.temperature ?? 0.35,
       max_tokens: options.max_tokens ?? 8192,
-      baseUrl:
-        import.meta.env.VITE_GROQ_API_BASE?.trim() || undefined,
+      baseUrl: import.meta.env.VITE_GROQ_API_BASE?.trim() || undefined,
     },
   };
 
