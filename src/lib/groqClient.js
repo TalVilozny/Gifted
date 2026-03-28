@@ -2,17 +2,28 @@
  * Groq (OpenAI-compatible chat completions) — fast inference for JSON tasks.
  *
  * **Local / client key:** `VITE_GROQ_API_KEY` in `.env` (browser; OK for dev).
- * **Production (Vercel):** set `GROQ_API_KEY` (server-only). Build sets
- * `VITE_GROQ_USE_PROXY` so the app calls `/api/groq` — key never ships to the client.
+ * **Production (Vercel):** set `GROQ_API_KEY` for **Runtime** (and Build if you want).
+ * The app calls `/api/groq` in production when no `VITE_GROQ_API_KEY` is set.
  * Keys: https://console.groq.com/
  */
 
 const DEFAULT_BASE = "https://api.groq.com/openai/v1";
 
+/**
+ * Use POST /api/groq (server key) when there is no browser key.
+ * - Dev: enabled when vite define sets VITE_GROQ_USE_PROXY (e.g. GROQ_API_KEY in .env).
+ * - Production (Vercel): always try the proxy — key may exist only at runtime, not at build.
+ */
+function useGroqProxyPath() {
+  if (import.meta.env.VITE_GROQ_API_KEY?.trim()) return false;
+  if (import.meta.env.VITE_GROQ_USE_PROXY === "true") return true;
+  if (import.meta.env.PROD) return true;
+  return false;
+}
+
 export function isGroqConfigured() {
   return Boolean(
-    import.meta.env.VITE_GROQ_API_KEY?.trim() ||
-    import.meta.env.VITE_GROQ_USE_PROXY === "true",
+    import.meta.env.VITE_GROQ_API_KEY?.trim() || useGroqProxyPath(),
   );
 }
 
@@ -107,7 +118,7 @@ export async function completeGroq(prompt, options = {}) {
   if (import.meta.env.VITE_GROQ_API_KEY?.trim()) {
     return completeGroqDirect(prompt, merged);
   }
-  if (import.meta.env.VITE_GROQ_USE_PROXY === "true") {
+  if (useGroqProxyPath()) {
     return completeGroqProxy(prompt, merged);
   }
   throw new Error("Groq is not configured");
