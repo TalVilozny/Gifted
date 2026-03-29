@@ -919,7 +919,7 @@ export default function App() {
 
   const budgetAnimateRafRef = useRef(null);
 
-  const groqReady = useMemo(() => isGroqConfigured(), []);
+  const groqReady = isGroqConfigured();
   const pexelsReady = useMemo(() => isPexelsConfigured(), []);
 
   const localizedRecipientRelations = useMemo(

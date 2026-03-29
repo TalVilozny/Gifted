@@ -1,15 +1,26 @@
 /**
  * Groq (OpenAI-compatible chat completions) — fast inference for JSON tasks.
  *
- * Set `VITE_GROQ_API_KEY` in `.env` (local) or in Vercel **Environment Variables** for the
- * build (Vite inlines `VITE_*` into the browser bundle — same visibility model as before
- * the serverless proxy). Keys: https://console.groq.com/
+ * Two ways to enable:
+ * 1) **Direct (browser → Groq):** `VITE_GROQ_API_KEY` in `.env` / Vercel build env (inlined in bundle).
+ * 2) **Proxy (recommended on Vercel):** `VITE_GROQ_PROXY=1` in the **build** env, and set
+ *    `GROQ_API_KEY` (server-only, not prefixed with VITE_) on Vercel. The app calls same-origin
+ *    `/api/groq` so the key never ships to the client and CORS is not an issue.
+ *
+ * Keys: https://console.groq.com/
  */
 
 const DEFAULT_BASE = "https://api.groq.com/openai/v1";
 
+function groqProxyEnabled() {
+  const v = import.meta.env.VITE_GROQ_PROXY;
+  return v === "1" || v === "true";
+}
+
 export function isGroqConfigured() {
-  return Boolean(import.meta.env.VITE_GROQ_API_KEY?.trim());
+  return Boolean(
+    import.meta.env.VITE_GROQ_API_KEY?.trim() || groqProxyEnabled(),
+  );
 }
 
 export function getGroqModelName() {
@@ -25,8 +36,11 @@ function apiBase() {
  * @param {{ model?: string, temperature?: number, max_tokens?: number, system?: string }} [options]
  */
 export async function completeGroq(prompt, options = {}) {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY?.trim();
-  if (!apiKey) throw new Error("Missing VITE_GROQ_API_KEY");
+  const directKey = import.meta.env.VITE_GROQ_API_KEY?.trim();
+  const proxy = groqProxyEnabled();
+  if (!directKey && !proxy) {
+    throw new Error("Missing VITE_GROQ_API_KEY or VITE_GROQ_PROXY");
+  }
 
   const model = options.model ?? getGroqModelName();
   const system = typeof options.system === "string" && options.system.trim()
@@ -39,26 +53,50 @@ export async function completeGroq(prompt, options = {}) {
       ]
     : [{ role: "user", content: prompt }];
 
-  const res = await fetch(`${apiBase()}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: options.temperature ?? 0.35,
-      max_tokens: options.max_tokens ?? 8192,
-    }),
-  });
+  const body = {
+    model,
+    messages,
+    temperature: options.temperature ?? 0.35,
+    max_tokens: options.max_tokens ?? 8192,
+  };
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(errText || `Groq API error (${res.status})`);
+  let data;
+  if (proxy) {
+    const res = await fetch("/api/groq", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = errText || `Groq API error (${res.status})`;
+      try {
+        const j = JSON.parse(errText);
+        if (j && typeof j.error === "string") msg = j.error;
+      } catch {
+        /* keep msg */
+      }
+      throw new Error(msg);
+    }
+    data = await res.json();
+  } else {
+    const res = await fetch(`${apiBase()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${directKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `Groq API error (${res.status})`);
+    }
+
+    data = await res.json();
   }
 
-  const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
   if (typeof content !== "string") {
     throw new Error("No text content in Groq response");
