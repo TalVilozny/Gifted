@@ -22,13 +22,23 @@ function apiBase() {
 
 /**
  * @param {string} prompt
- * @param {{ model?: string, temperature?: number, max_tokens?: number }} [options]
+ * @param {{ model?: string, temperature?: number, max_tokens?: number, system?: string }} [options]
  */
 export async function completeGroq(prompt, options = {}) {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY?.trim();
   if (!apiKey) throw new Error("Missing VITE_GROQ_API_KEY");
 
   const model = options.model ?? getGroqModelName();
+  const system = typeof options.system === "string" && options.system.trim()
+    ? options.system.trim()
+    : "";
+  const messages = system
+    ? [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ]
+    : [{ role: "user", content: prompt }];
+
   const res = await fetch(`${apiBase()}/chat/completions`, {
     method: "POST",
     headers: {
@@ -37,7 +47,7 @@ export async function completeGroq(prompt, options = {}) {
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: "user", content: prompt }],
+      messages,
       temperature: options.temperature ?? 0.35,
       max_tokens: options.max_tokens ?? 8192,
     }),

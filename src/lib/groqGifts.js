@@ -334,6 +334,11 @@ export async function rankGiftsWithGroq({
       ? `- **User-typed custom interests** (treat as mandatory): ${JSON.stringify(customLabels)} — rank items that clearly reflect these strings above gifts that only match generic presets.\n`
       : "";
 
+  const rankHasCustom = (customLabels?.length ?? 0) > 0;
+  const rankSystem = rankHasCustom
+    ? `The user listed custom interests — when reordering, rank gifts that clearly reflect those exact interests above gifts that only match broad categories.`
+    : "";
+
   const prompt = `You are an expert gift advisor.
 
 User context:
@@ -359,7 +364,10 @@ Rules:
 options:
 ${JSON.stringify(options, null, 2)}`;
 
-  const text = await completeGroq(prompt, { temperature: 0.12 });
+  const text = await completeGroq(prompt, {
+    temperature: 0.12,
+    ...(rankSystem ? { system: rankSystem } : {}),
+  });
   const parsed = extractJsonObject(text);
   const ids = parsed.orderedIds;
   if (!Array.isArray(ids) || ids.length === 0) return null;
@@ -595,9 +603,15 @@ Return ONLY valid JSON:
   ]
 }`;
 
+  const hasCustom = (customLabels?.length ?? 0) > 0;
+  const systemPrompt = hasCustom
+    ? `The user typed specific custom interests — those strings are mandatory. Every gift in your JSON must clearly relate to at least one of those exact interests (or a direct synonym) in the product name, blurb, or tags. Ignoring the user's custom text and suggesting only generic preset-category gifts is a failure. Put the user's words (or close synonyms) into "tags" whenever possible.`
+    : "";
+
   const text = await completeGroq(prompt, {
     temperature: relaxedCustom ? 0.48 : 0.55,
     max_tokens: 8192,
+    ...(systemPrompt ? { system: systemPrompt } : {}),
   });
   const parsed = extractJsonObject(text);
   const rawList = parsed.gifts;
@@ -897,7 +911,14 @@ Return ONLY valid JSON (no markdown fences):
   "curatorNote": "One sentence explaining the overall curation rationale."
 }`;
 
-  const text = await completeGroq(prompt);
+  const luxSystem =
+    (customLabels?.length ?? 0) > 0
+      ? `The user typed specific interests — luxury suggestions must clearly reflect those interests, not generic opulence unrelated to their hobbies.`
+      : "";
+
+  const text = await completeGroq(prompt, {
+    ...(luxSystem ? { system: luxSystem } : {}),
+  });
   const parsed = extractJsonObject(text);
   if (!Array.isArray(parsed.gifts) || parsed.gifts.length === 0) return null;
   return {

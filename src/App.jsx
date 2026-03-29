@@ -128,8 +128,10 @@ function mergeGiftListsInto(
 
 const MIN_RESULT_GIFTS = 3;
 
-function padResultToMinimumGifts(rec, minCount, catalogParams) {
+function padResultToMinimumGifts(rec, minCount, catalogParams, skipCatalogPad = false) {
   if (rec?.gifts?.length >= minCount) return rec;
+  /** Avoid stuffing unrelated catalog gifts when we already have Groq rows for user-typed hobbies. */
+  if (skipCatalogPad && rec?.gifts?.length > 0) return rec;
   const filler = { ...getRecommendations(catalogParams), source: "catalog" };
   return mergeGiftListsInto(rec, filler, minCount, "catalog");
 }
@@ -1212,9 +1214,13 @@ export default function App() {
     };
 
     const inferredIds = inferHobbyIdsFromCustomLabels(customHobbies);
-    const hobbyTitles = [...new Set([...selectedHobbyIds, ...inferredIds])]
+    let hobbyTitles = [...new Set([...selectedHobbyIds, ...inferredIds])]
       .map((id) => hobbies.find((h) => h.id === id)?.title)
       .filter(Boolean);
+    /** Preset titles alone can be empty when the user only adds custom chips — still pass those strings into Groq as "titles". */
+    if (hobbyTitles.length === 0 && customHobbies.length > 0) {
+      hobbyTitles = customHobbies.map((s) => String(s).trim()).filter(Boolean);
+    }
 
     const catalogRec = getRecommendations({
       selectedHobbyIds,
@@ -1330,7 +1336,14 @@ export default function App() {
       }
     }
 
-    rec = mergeGiftListsInto(rec, catalogExcluded, MIN_SUGGESTIONS, "groq");
+    /** Do not pad AI results with unrelated catalog rows when we have custom hobbies and enough Groq rows (avoids generic gifts drowning custom-specific ones). */
+    const skipCatalogMerge =
+      customHobbies.length > 0 &&
+      rec?.source === "groq" &&
+      (rec?.gifts?.length ?? 0) >= MIN_SUGGESTIONS;
+    if (!skipCatalogMerge) {
+      rec = mergeGiftListsInto(rec, catalogExcluded, MIN_SUGGESTIONS, "groq");
+    }
     if (rec?.gifts?.length) {
       const sorted = sortFinalizedGiftsForDisplay(
         rec.gifts,
@@ -1382,16 +1395,21 @@ export default function App() {
       recommendationMinBudgetUsd,
       budgetUnlimited,
     );
-    priced = padResultToMinimumGifts(priced, MIN_RESULT_GIFTS, {
-      selectedHobbyIds,
-      customLabels: customHobbies,
-      gender,
-      budgetUSD: recommendationBudgetUsd,
-      minBudgetUSD: recommendationMinBudgetUsd,
-      wantDIY: giftPref === "diy",
-      giftPreference: giftPref,
-      budgetUnlimited,
-    });
+    priced = padResultToMinimumGifts(
+      priced,
+      MIN_RESULT_GIFTS,
+      {
+        selectedHobbyIds,
+        customLabels: customHobbies,
+        gender,
+        budgetUSD: recommendationBudgetUsd,
+        minBudgetUSD: recommendationMinBudgetUsd,
+        wantDIY: giftPref === "diy",
+        giftPreference: giftPref,
+        budgetUnlimited,
+      },
+      customHobbies.length > 0 && stamped?.source === "groq",
+    );
     if (priced?.gifts?.length) {
       const sorted = sortFinalizedGiftsForDisplay(
         priced.gifts,
