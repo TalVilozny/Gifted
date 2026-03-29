@@ -1253,7 +1253,8 @@ export default function App() {
 
     if (groqReady) {
       let ai = null;
-      const useRelaxedFirst = customHobbies.length > 0;
+      /** Strict prompt first when custom hobbies exist so FOCUS / coverage rules apply before a looser retry. */
+      const useRelaxedFirst = customHobbies.length === 0;
       try {
         ai = await generateGiftIdeasWithGroq({
           ...groqParams,

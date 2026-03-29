@@ -153,10 +153,20 @@ export function clampRetailPriceUSD(
 }
 
 function primaryHobbyKey(selectedHobbyIds, customLabels) {
+  const fromCustom = inferHobbyIdsFromCustomLabels(customLabels);
+  if (fromCustom.length) return fromCustom[0];
   if (selectedHobbyIds?.length) return selectedHobbyIds[0];
-  const inf = inferHobbyIdsFromCustomLabels(customLabels);
-  if (inf.length) return inf[0];
   return "general";
+}
+
+/** User-typed hobbies first in prompts so Groq weights them at least as much as presets. */
+function interestListForPrompt(hobbyTitles, customLabels) {
+  const customs = (customLabels || []).map(String).filter(Boolean);
+  const titles = (hobbyTitles || []).map(String).filter(Boolean);
+  if (customs.length === 0) return titles;
+  const low = new Set(customs.map((c) => c.trim().toLowerCase()));
+  const rest = titles.filter((t) => !low.has(t.trim().toLowerCase()));
+  return [...customs, ...rest];
 }
 
 function formatRecipientMeta(recipientId, recipientAgeRange, recipientGroupSize = null) {
@@ -319,12 +329,17 @@ export async function rankGiftsWithGroq({
     recipientGroupSize,
   );
 
+  const customRankHint =
+    (customLabels?.length ?? 0) > 0
+      ? `- **User-typed custom interests** (treat as mandatory): ${JSON.stringify(customLabels)} — rank items that clearly reflect these strings above gifts that only match generic presets.\n`
+      : "";
+
   const prompt = `You are an expert gift advisor.
 
 User context:
 - Gifts for: ${genderLabel}
-${recipientMeta}- Interests (hobbies): ${JSON.stringify([...hobbyTitles, ...customLabels])}
-${budgetLine}${prefLine}
+${recipientMeta}- Interests (hobbies; custom text listed first when present): ${JSON.stringify(interestListForPrompt(hobbyTitles, customLabels))}
+${customRankHint}${budgetLine}${prefLine}
 Reorder the gift options from **best overall fit** to weaker fit for ${reorderTarget}. Use a **stable, rule-based** ordering (no random tie-breaking).
 
 Priorities (in order):
@@ -486,14 +501,29 @@ CRITICAL — **Ready-made products** they unwrap:
 - Set "diy": false unless the product is explicitly a commercial kit they assemble at home.
 `;
 
+  const minRowsPerCustomString =
+    (customLabels?.length ?? 0) > 0 && (customLabels?.length ?? 0) <= 4
+      ? 3
+      : 2;
+
   const customCoverageSection =
     (customLabels?.length ?? 0) > 0
       ? `
 COVERAGE — **User-added custom interests** (mandatory; honor every string): ${JSON.stringify(customLabels)}.
-- For **each** string, include **at least 2 gift rows** where the variant name, blurb, or tags clearly reflect that interest (synonyms OK; repeat keywords is fine).
+- For **each** string, include **at least ${minRowsPerCustomString} gift rows** where the variant name, blurb, or tags clearly reflect that interest (synonyms OK; repeat keywords is fine).
 - Examples: "Sim racing" → racing wheel, pedals, cockpit/frame, direct-drive wheel base; include tags like "sim racing", "racing wheel", or words from the user’s string.
 - **Never** substitute a generic dining/spa/travel **gift card** for a hobby that calls for **gear or equipment** (sim racing, gaming, music, sports, crafts, tech, etc.).
-- Do **not** output a curation where **none** of the ideas relate to these custom strings when they are listed alongside presets—the custom text must appear across several rows.
+- If preset tile hobbies appear in the list too, **blend** them with these custom strings — do **not** ignore custom text in favor of generic preset-category ideas.
+- Do **not** output a curation where **none** of the ideas relate to these custom strings when they are listed alongside presets—the custom text must appear across **many** rows (not only 1–2).
+`
+      : "";
+
+  const customHighestPrioritySection =
+    (customLabels?.length ?? 0) > 0
+      ? `
+PRIORITY — **Custom interests are co-equal or stronger than preset categories.**
+- The user explicitly typed: ${JSON.stringify(customLabels)}. At least **half** of all gift rows (9+ of 18) must clearly reference at least one of these strings (or an obvious synonym) in the product name, blurb, or tags.
+- A gift that only fits a broad preset (e.g. "gaming") but **ignores** the user’s custom wording is **wrong** unless no custom string applies to that row at all.
 `
       : "";
 
@@ -527,14 +557,17 @@ ${JSON.stringify(excludedProductNames.slice(0, 60))}
     recipientGroupSize,
   );
 
+  const interestsOrdered = interestListForPrompt(hobbyTitles, customLabels);
+
   const prompt = `You are a creative gift curator. Invent concrete, shoppable gift ideas (specific product styles, not vague categories).
 
 Recipient: ${genderLabel}
-${recipientMeta}Interests: ${JSON.stringify([...hobbyTitles, ...customLabels])}
+${recipientMeta}Interests (custom hobbies listed first when present): ${JSON.stringify(interestsOrdered)}
 Primary hobby bucket (for theming): ${hobbyKey}
 
 ${budgetInstruction}
 ${preferenceSection}
+${customHighestPrioritySection}
 ${customCoverageSection}
 ${customOnlySection}
 ${excludedSection}
@@ -832,15 +865,22 @@ export async function generateLuxuryGiftsWithGroq({
           ? "a nonbinary person"
           : "a person";
 
+  const luxInterests = interestListForPrompt(hobbyTitles, customLabels);
+  const customLux =
+    (customLabels?.length ?? 0) > 0
+      ? `- **User-typed interests** (must reflect in most suggestions): ${JSON.stringify(customLabels)}\n`
+      : "";
+
   const prompt = `You are an expert luxury gift advisor with deep knowledge of premium products worldwide.
 
 User context:
 - Recipient: ${genderLabel}
-- Interests: ${JSON.stringify([...hobbyTitles, ...customLabels])}
-- Budget: No limit — focus on premium, luxury, and high-end gifts
+- Interests (custom text first when present): ${JSON.stringify(luxInterests)}
+${customLux}- Budget: No limit — focus on premium, luxury, and high-end gifts
 ${wantDIY ? "- Preference: bespoke, handcrafted, or experiential gifts\n" : ""}
 Suggest 8 exceptional gifts. Think: luxury watches, fine jewellery, premium experiences (private lessons, retreats, tastings), bespoke clothing, high-end tech, collector editions, and rare items.
 Choose gifts that genuinely match their interests — a gamer gets a premium gaming chair or limited-edition console, not a generic luxury item.
+When the user added **custom** hobby text, most of the 8 ideas must clearly tie to those exact words or close synonyms — not only to broad categories.
 
 Return ONLY valid JSON (no markdown fences):
 {
