@@ -128,7 +128,12 @@ function mergeGiftListsInto(
 
 const MIN_RESULT_GIFTS = 3;
 
-function padResultToMinimumGifts(rec, minCount, catalogParams, skipCatalogPad = false) {
+function padResultToMinimumGifts(
+  rec,
+  minCount,
+  catalogParams,
+  skipCatalogPad = false,
+) {
   if (rec?.gifts?.length >= minCount) return rec;
   /** Avoid stuffing unrelated catalog gifts when we already have Groq rows for user-typed hobbies. */
   if (skipCatalogPad && rec?.gifts?.length > 0) return rec;
@@ -766,7 +771,10 @@ function buildImageSearchQuery(product, gift, interestTermsToExclude = []) {
     deduped.push(w);
   }
   if (deduped.length === 0) {
-    const fb = (clean(gift?.categoryTitle) || "gift").split(" ").slice(0, 4).join(" ");
+    const fb = (clean(gift?.categoryTitle) || "gift")
+      .split(" ")
+      .slice(0, 4)
+      .join(" ");
     return `${fb} product`.trim().slice(0, 100);
   }
   const core = deduped.join(" ").slice(0, 100);
@@ -846,6 +854,7 @@ export default function App() {
   const [dislikedIds, setDislikedIds] = useState([]);
   const [isReloading, setIsReloading] = useState(false);
   const [caseOpen, setCaseOpen] = useState(false);
+  const [pickForMeMinLikesOpen, setPickForMeMinLikesOpen] = useState(false);
   const [caseTranslateX, setCaseTranslateX] = useState(0);
   const [caseTransitionOn, setCaseTransitionOn] = useState(false);
   const [caseRunning, setCaseRunning] = useState(false);
@@ -1647,6 +1656,7 @@ export default function App() {
     setDislikedEntries([]);
     setDislikedIds([]);
     setCaseOpen(false);
+    setPickForMeMinLikesOpen(false);
     clearCaseFallbackTimer();
     casePendingRef.current = null;
     setCaseTranslateX(0);
@@ -2631,6 +2641,32 @@ export default function App() {
                 </h2>
                 <p className="Panel__lead">{t("passion_lead")}</p>
 
+                <Analytics />
+                <div className="HobbyGrid">
+                  {localizedHobbies.map((h) => {
+                    const on = selectedHobbyIds.includes(h.id);
+                    return (
+                      <button
+                        key={h.id}
+                        type="button"
+                        className={`HobbyCard${on ? " HobbyCard--selected" : ""}`}
+                        style={{ "--hobby-bg": h.cardGradient }}
+                        onClick={() =>
+                          setSelectedHobbyIds((prev) =>
+                            toggleInList(prev, h.id),
+                          )
+                        }
+                      >
+                        <span className="HobbyCard__emoji" aria-hidden>
+                          {h.emoji}
+                        </span>
+                        <span className="HobbyCard__title">{h.title}</span>
+                        <span className="HobbyCard__sub">{h.subtitle}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {hasPassions && (
                   <div
                     className="ChipStrip"
@@ -2673,31 +2709,6 @@ export default function App() {
                     ))}
                   </div>
                 )}
-                <Analytics />
-                <div className="HobbyGrid">
-                  {localizedHobbies.map((h) => {
-                    const on = selectedHobbyIds.includes(h.id);
-                    return (
-                      <button
-                        key={h.id}
-                        type="button"
-                        className={`HobbyCard${on ? " HobbyCard--selected" : ""}`}
-                        style={{ "--hobby-bg": h.cardGradient }}
-                        onClick={() =>
-                          setSelectedHobbyIds((prev) =>
-                            toggleInList(prev, h.id),
-                          )
-                        }
-                      >
-                        <span className="HobbyCard__emoji" aria-hidden>
-                          {h.emoji}
-                        </span>
-                        <span className="HobbyCard__title">{h.title}</span>
-                        <span className="HobbyCard__sub">{h.subtitle}</span>
-                      </button>
-                    );
-                  })}
-                </div>
 
                 <div className="AddHobby">
                   <label className="FieldLabel" htmlFor="custom-hobby">
@@ -3190,6 +3201,10 @@ export default function App() {
                     type="button"
                     className="Btn Btn--ghost"
                     onClick={() => {
+                      if (likedEntries.length < 2) {
+                        setPickForMeMinLikesOpen(true);
+                        return;
+                      }
                       clearCaseFallbackTimer();
                       casePendingRef.current = null;
                       setCaseWinner(null);
@@ -3198,12 +3213,6 @@ export default function App() {
                       setCaseRunning(false);
                       setCaseOpen(true);
                     }}
-                    disabled={likedEntries.length < 2}
-                    title={
-                      likedEntries.length < 2
-                        ? t("pick_for_me_title")
-                        : undefined
-                    }
                   >
                     {t("pick_for_me")}
                   </button>
@@ -3618,6 +3627,42 @@ export default function App() {
                   })}
                 </ul>
 
+                {pickForMeMinLikesOpen && (
+                  <div
+                    className="CaseModal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="pick-for-me-min-likes-title"
+                  >
+                    <button
+                      type="button"
+                      className="CaseModal__backdrop"
+                      aria-label={t("case_close_aria")}
+                      onClick={() => setPickForMeMinLikesOpen(false)}
+                    />
+                    <div className="CaseModal__panel">
+                      <h3
+                        id="pick-for-me-min-likes-title"
+                        className="CaseModal__title"
+                      >
+                        {t("pick_for_me")}
+                      </h3>
+                      <p className="CaseModal__lede">
+                        {t("pick_for_me_need_likes")}
+                      </p>
+                      <div className="Panel__actions Panel__actions--solo">
+                        <button
+                          type="button"
+                          className="Btn Btn--primary"
+                          onClick={() => setPickForMeMinLikesOpen(false)}
+                        >
+                          {t("case_close")}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {caseOpen && (
                   <div
                     className="CaseModal"
@@ -3665,7 +3710,7 @@ export default function App() {
                                   minWidth: CASE_ITEM_PX,
                                 }}
                               >
-                                <span className="CaseStrip__name">
+                                <span className="CaseStrip__name" dir="auto">
                                   {displayProduct(entry.gift).name}
                                 </span>
                               </div>
@@ -3684,14 +3729,45 @@ export default function App() {
                           {caseRunning ? t("case_choosing") : t("case_choose")}
                         </button>
                         {caseWinner && (
-                          <p className="CaseModal__winner" role="status">
-                            <span className="CaseModal__winnerLabel">
-                              {t("case_you_should")}
-                            </span>
-                            <strong>
-                              {displayProduct(caseWinner.gift).name}
-                            </strong>
-                          </p>
+                          <div className="CaseModal__winnerBlock">
+                            <p className="CaseModal__winner" role="status">
+                              <span className="CaseModal__winnerLabel">
+                                {t("case_you_should")}
+                              </span>
+                              <strong>
+                                {displayProduct(caseWinner.gift).name}
+                              </strong>
+                            </p>
+                            <div className="CaseModal__winnerWant">
+                              <button
+                                type="button"
+                                className="Btn Btn--want"
+                                onClick={() =>
+                                  void handleWantThis(caseWinner.gift)
+                                }
+                                disabled={
+                                  openingGiftId === caseWinner.gift.id
+                                }
+                              >
+                                {openingGiftId === caseWinner.gift.id
+                                  ? t("want_finding")
+                                  : t("want_this")}
+                              </button>
+                              <p className="CaseModal__winnerWantHint">
+                                {groqReady
+                                  ? t("want_hint_groq")
+                                  : t("want_hint_google")}
+                              </p>
+                              {wantThisErrorByGiftId[caseWinner.gift.id] && (
+                                <p
+                                  className="RefineBlock__error"
+                                  role="status"
+                                >
+                                  {wantThisErrorByGiftId[caseWinner.gift.id]}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         )}
                         <button
                           type="button"

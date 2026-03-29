@@ -169,6 +169,8 @@ const en = {
   loading: "Loading…",
   pick_for_me: "Pick for me",
   pick_for_me_title: "Like at least two gifts to pick between them",
+  pick_for_me_need_likes:
+    "Like at least two gift ideas before using Pick for me.",
   diy_section_title: "DIY ideas you can make without buying a kit",
   diy_section_lead:
     "Since you picked “I want to make it myself” with a lower budget, here are tutorials for handmade gifts.",
@@ -467,6 +469,8 @@ const he = {
   loading: "טוען…",
   pick_for_me: "בחרו בשבילי",
   pick_for_me_title: "סמנו לייק לפחות לשתי מתנות כדי לבחור ביניהן",
+  pick_for_me_need_likes:
+    "סמנו לייק לפחות לשתי רעיונות למתנות לפני שימוש ב־„בחרו בשבילי”.",
   diy_section_title: "רעיונות DIY בלי לקנות ערכה",
   diy_section_lead:
     "בחרתם „אני רוצה להכין בעצמי” עם תקציב נמוך — הנה מדריכים למתנות בעשייה ידנית.",

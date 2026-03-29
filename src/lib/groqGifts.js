@@ -51,12 +51,10 @@ function realisticReviewsForVariant(productName, variantKey) {
       `Got it as a gift—recipient was thrilled. ${short} looks more premium in person.`,
     () =>
       `Quick shipping, honest photos. Only nit is the manual could be clearer, but setup was still easy.`,
-    () =>
-      `Took a chance based on reviews and they were right. No regrets.`,
+    () => `Took a chance based on reviews and they were right. No regrets.`,
     () =>
       `Customer support answered my question in hours. Product itself is great.`,
-    () =>
-      `Comparable to what I tried in-store. Saved money ordering online.`,
+    () => `Comparable to what I tried in-store. Saved money ordering online.`,
   ];
   const pick = (i) => lines[(seed + i) % lines.length]();
   const star = (i) => 4 + ((seed >> (i * 3)) % 2);
@@ -92,7 +90,11 @@ function interestsSoundFoodSpaOrTravel(customLabels) {
  * Kept intentionally narrow: broad matching removed valid products whose blurbs
  * mentioned “travel” etc. alongside unrelated “gift” wording, which emptied lists.
  */
-function shouldDropLazyExperienceGiftCardRow(item, giftPreference, customLabels) {
+function shouldDropLazyExperienceGiftCardRow(
+  item,
+  giftPreference,
+  customLabels,
+) {
   if (giftPreference === "experience") return false;
   const vars = Array.isArray(item?.variants) ? item.variants : [];
   const text = [
@@ -136,7 +138,9 @@ export function clampRetailPriceUSD(
   const x = Number(n);
   const minOk = Math.max(0, Number(minBudgetUSD) || 0);
   const cap =
-    typeof budgetUSD === "number" && Number.isFinite(budgetUSD) ? budgetUSD : 75;
+    typeof budgetUSD === "number" && Number.isFinite(budgetUSD)
+      ? budgetUSD
+      : 75;
   const softLow = minOk > 0 ? minOk : budgetUnlimited ? 10 : 15;
 
   if (!Number.isFinite(x) || x < 0) {
@@ -169,7 +173,11 @@ function interestListForPrompt(hobbyTitles, customLabels) {
   return [...customs, ...rest];
 }
 
-function formatRecipientMeta(recipientId, recipientAgeRange, recipientGroupSize = null) {
+function formatRecipientMeta(
+  recipientId,
+  recipientAgeRange,
+  recipientGroupSize = null,
+) {
   const rel =
     typeof recipientId === "string" && recipientId.trim()
       ? recipientId.trim()
@@ -221,7 +229,10 @@ function formatRecipientMeta(recipientId, recipientAgeRange, recipientGroupSize 
         : `Age: ${age}`,
     );
   }
-  if (typeof recipientGroupSize === "number" && Number.isFinite(recipientGroupSize)) {
+  if (
+    typeof recipientGroupSize === "number" &&
+    Number.isFinite(recipientGroupSize)
+  ) {
     bits.push(`Group size: ${Math.max(2, Math.round(recipientGroupSize))}`);
   }
   return `- ${bits.join(" | ")}\n`;
@@ -262,15 +273,14 @@ export async function rankGiftsWithGroq({
 }) {
   if (!isGroqConfigured() || !gifts.length) return null;
 
-  const isGroup = typeof recipientId === "string" && recipientId.startsWith("group-");
+  const isGroup =
+    typeof recipientId === "string" && recipientId.startsWith("group-");
   const reorderTarget = isGroup ? "this group" : "this person";
 
   let pool = gifts;
   if (budgetUnlimited) {
     const premium = gifts.filter(
-      (g) =>
-        g._sourceHobbyId === "luxury" ||
-        g.selectedProduct.priceUSD >= 200,
+      (g) => g._sourceHobbyId === "luxury" || g.selectedProduct.priceUSD >= 200,
     );
     if (premium.length > 0) pool = premium;
   }
@@ -289,7 +299,9 @@ export async function rankGiftsWithGroq({
 
   if (options.length === 0) return null;
 
-  const groupComposition = isGroup ? String(recipientId).split("-").at(-1) : null;
+  const groupComposition = isGroup
+    ? String(recipientId).split("-").at(-1)
+    : null;
   const genderLabel = isGroup
     ? groupComposition === "male"
       ? "a group of men"
@@ -408,7 +420,8 @@ function enrichVariantTagsForCustomHobbies(rawVariants, customLabels) {
   if (!customLabels?.length || !Array.isArray(rawVariants)) return rawVariants;
   return rawVariants.map((v) => {
     const tags = Array.isArray(v.tags) ? [...v.tags.map(String)] : [];
-    const blob = `${v.name ?? ""} ${v.blurb ?? ""} ${tags.join(" ")}`.toLowerCase();
+    const blob =
+      `${v.name ?? ""} ${v.blurb ?? ""} ${tags.join(" ")}`.toLowerCase();
     for (const label of customLabels) {
       const lab = String(label).trim();
       if (!lab) continue;
@@ -445,7 +458,8 @@ export async function generateGiftIdeasWithGroq({
 }) {
   if (!isGroqConfigured()) return null;
 
-  const isGroup = typeof recipientId === "string" && recipientId.startsWith("group-");
+  const isGroup =
+    typeof recipientId === "string" && recipientId.startsWith("group-");
   const groupComposition = isGroup ? recipientId.split("-").at(-1) : null;
 
   const genderLabel = isGroup
@@ -510,9 +524,7 @@ CRITICAL — **Ready-made products** they unwrap:
 `;
 
   const minRowsPerCustomString =
-    (customLabels?.length ?? 0) > 0 && (customLabels?.length ?? 0) <= 4
-      ? 3
-      : 2;
+    (customLabels?.length ?? 0) > 0 && (customLabels?.length ?? 0) <= 4 ? 3 : 2;
 
   const customCoverageSection =
     (customLabels?.length ?? 0) > 0
@@ -813,9 +825,7 @@ export async function enrichResultWithRetailPriceEstimates(
         budgetUnlimited,
       });
     const cap = budgetUnlimited ? Infinity : recommendationBudgetUsd;
-    const minUsd = budgetUnlimited
-      ? 0
-      : Math.max(0, Number(minBudgetUSD) || 0);
+    const minUsd = budgetUnlimited ? 0 : Math.max(0, Number(minBudgetUSD) || 0);
     const nextGifts = rec.gifts
       .map((gift) => {
         const nextVariants = (gift.variants || []).map((v) => {
