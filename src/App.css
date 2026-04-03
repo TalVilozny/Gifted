@@ -26,7 +26,7 @@
   --theme-switch-border-hover: rgba(255, 255, 255, 0.22);
   --theme-switch-shadow:
     0 1px 3px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --theme-thumb: #2563eb;
+  --theme-thumb: #c9a227;
   --shell-glow-inner: rgba(139, 92, 246, 0.22);
   --case-viewport-mid: linear-gradient(
     180deg,
@@ -413,6 +413,10 @@ html[data-theme="dark"] .ThemeSwitch__btn:hover {
 
 .ThemeSwitch__btn--dark .ThemeSwitch__thumb {
   left: calc(100% - 3px - 1.625rem);
+}
+
+html[data-theme="dark"] .ThemeSwitch__thumb {
+  box-shadow: 0 1px 4px rgba(201, 162, 39, 0.45);
 }
 
 .ThemeSwitch__icons {
