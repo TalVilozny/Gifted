@@ -47,13 +47,15 @@ html:lang(he) {
 
 html[data-theme="light"] {
   color-scheme: light;
-  /* Social-style light: lavender page + white cards + cool neutrals (ref: #e2e7fa) */
+  /* Social-style light: lavender page + gray main panel + blue-tint option cards */
   --bg: #e2e7fa;
   --stage: #f5f6fb;
   --surface: #eef1f9;
-  --surface-bright: #ffffff;
+  /* Was #fff — light gray surfaces (main card) */
+  --surface-bright: #f8fafc;
   --surface-muted: #e2e8f0;
-  --bg-elevated: #fafbff;
+  /* Main Panel / large rectangle */
+  --bg-elevated: #e8ecf8;
   --stroke: rgba(15, 23, 42, 0.09);
   --text: #0f172a;
   --muted: #64748b;
@@ -90,7 +92,8 @@ html[data-theme="light"] .Panel {
 }
 
 html[data-theme="light"] .ChoiceCard {
-  background: rgba(15, 23, 42, 0.03);
+  background: #e2e7fa;
+  border-color: rgba(148, 163, 184, 0.32);
 }
 
 html[data-theme="light"] .Chip {
@@ -2865,7 +2868,7 @@ html[data-theme="light"] .CaseModal__panel {
   border-color: var(--stroke);
   box-shadow:
     var(--shadow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   color: var(--text);
 }
 
@@ -2929,14 +2932,22 @@ html[data-theme="light"] .Header__mark {
 }
 
 html[data-theme="light"] .ChoiceCard:hover {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.48);
+  background: linear-gradient(
+    165deg,
+    rgba(191, 219, 254, 0.95),
+    rgba(147, 197, 253, 0.78)
+  );
 }
 
 html[data-theme="light"] .ChoiceCard--selected {
-  border-color: rgba(37, 99, 235, 0.65);
-  background: rgba(37, 99, 235, 0.1);
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.22);
+  border-color: rgba(37, 99, 235, 0.58);
+  background: linear-gradient(
+    165deg,
+    rgba(147, 197, 253, 0.88),
+    rgba(191, 219, 254, 0.92)
+  );
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.28);
 }
 
 html[data-theme="light"] .HobbyCard--selected {
