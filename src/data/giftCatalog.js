@@ -32,7 +32,7 @@ export const hobbies = [
     title: "Video Games",
     subtitle: "Controllers, consoles, and late-night raids",
     cardGradient:
-      "linear-gradient(145deg, rgba(139, 92, 246, 0.18), rgba(217, 70, 239, 0.1))",
+      "linear-gradient(145deg, rgba(139, 92, 246, 0.38), rgba(217, 70, 239, 0.26))",
     emoji: "🎮",
     forGender: "male",
   },
@@ -41,7 +41,7 @@ export const hobbies = [
     title: "Motion & muscle",
     subtitle: "Sweat, recovery, and personal bests",
     cardGradient:
-      "linear-gradient(145deg, rgba(16, 185, 129, 0.18), rgba(20, 184, 166, 0.1))",
+      "linear-gradient(145deg, rgba(16, 185, 129, 0.36), rgba(20, 184, 166, 0.24))",
     emoji: "💪",
   },
   {
@@ -49,7 +49,7 @@ export const hobbies = [
     title: "Paper & ink",
     subtitle: "Stories that follow you home",
     cardGradient:
-      "linear-gradient(145deg, rgba(245, 158, 11, 0.2), rgba(249, 115, 22, 0.1))",
+      "linear-gradient(145deg, rgba(245, 158, 11, 0.4), rgba(249, 115, 22, 0.26))",
     emoji: "📚",
   },
   {
@@ -57,7 +57,7 @@ export const hobbies = [
     title: "Brew rituals",
     subtitle: "Grinders, beans, and the perfect pour",
     cardGradient:
-      "linear-gradient(145deg, rgba(120, 113, 108, 0.2), rgba(180, 83, 9, 0.12))",
+      "linear-gradient(145deg, rgba(120, 113, 108, 0.38), rgba(180, 83, 9, 0.28))",
     emoji: "☕",
   },
   {
@@ -65,7 +65,7 @@ export const hobbies = [
     title: "Sound & soul",
     subtitle: "Vinyl, headphones, and live-room magic",
     cardGradient:
-      "linear-gradient(145deg, rgba(244, 63, 94, 0.16), rgba(99, 102, 241, 0.12))",
+      "linear-gradient(145deg, rgba(244, 63, 94, 0.34), rgba(99, 102, 241, 0.26))",
     emoji: "🎧",
   },
   {
@@ -73,7 +73,7 @@ export const hobbies = [
     title: "Hands & heart",
     subtitle: "Tools, textures, and made-by-me pride",
     cardGradient:
-      "linear-gradient(145deg, rgba(236, 72, 153, 0.16), rgba(168, 85, 247, 0.12))",
+      "linear-gradient(145deg, rgba(236, 72, 153, 0.34), rgba(168, 85, 247, 0.26))",
     emoji: "🧵",
     forGender: "female",
   },
@@ -82,7 +82,7 @@ export const hobbies = [
     title: "Photography",
     subtitle: "Cameras, lenses, lighting, and creative shots",
     cardGradient:
-      "linear-gradient(145deg, rgba(14, 165, 233, 0.18), rgba(37, 99, 235, 0.1))",
+      "linear-gradient(145deg, rgba(14, 165, 233, 0.36), rgba(37, 99, 235, 0.24))",
     emoji: "📷",
   },
   {
@@ -90,7 +90,7 @@ export const hobbies = [
     title: "Kitchen alchemy",
     subtitle: "Knives, heat, and flavor experiments",
     cardGradient:
-      "linear-gradient(145deg, rgba(239, 68, 68, 0.16), rgba(245, 158, 11, 0.12))",
+      "linear-gradient(145deg, rgba(239, 68, 68, 0.34), rgba(245, 158, 11, 0.26))",
     emoji: "🍳",
   },
   {
@@ -98,7 +98,7 @@ export const hobbies = [
     title: "Form & function",
     subtitle: "Typography, objects, and quiet taste",
     cardGradient:
-      "linear-gradient(145deg, rgba(115, 115, 115, 0.18), rgba(63, 63, 70, 0.12))",
+      "linear-gradient(145deg, rgba(115, 115, 115, 0.36), rgba(63, 63, 70, 0.26))",
     emoji: "✏️",
   },
   {
@@ -106,7 +106,7 @@ export const hobbies = [
     title: "Soil & sun",
     subtitle: "Seeds, shears, and slow growth",
     cardGradient:
-      "linear-gradient(145deg, rgba(34, 197, 94, 0.18), rgba(163, 230, 53, 0.1))",
+      "linear-gradient(145deg, rgba(34, 197, 94, 0.36), rgba(163, 230, 53, 0.24))",
     emoji: "🌿",
   },
   {
@@ -114,7 +114,7 @@ export const hobbies = [
     title: "Silhouette",
     subtitle: "Fabric, scent, and confident details",
     cardGradient:
-      "linear-gradient(145deg, rgba(217, 70, 239, 0.16), rgba(124, 58, 237, 0.12))",
+      "linear-gradient(145deg, rgba(217, 70, 239, 0.34), rgba(124, 58, 237, 0.26))",
     emoji: "✨",
     forGender: "female",
   },
@@ -123,7 +123,7 @@ export const hobbies = [
     title: "Asphalt & chrome",
     subtitle: "Detailing, dash cams, and weekend drives",
     cardGradient:
-      "linear-gradient(145deg, rgba(71, 85, 105, 0.25), rgba(234, 88, 12, 0.14))",
+      "linear-gradient(145deg, rgba(71, 85, 105, 0.42), rgba(234, 88, 12, 0.3))",
     emoji: "🏎️",
     forGender: "male",
   },
@@ -132,7 +132,7 @@ export const hobbies = [
     title: "Jewelry",
     subtitle: "Necklaces, rings, and pieces they’ll wear on repeat",
     cardGradient:
-      "linear-gradient(145deg, rgba(236, 72, 153, 0.22), rgba(244, 114, 182, 0.12))",
+      "linear-gradient(145deg, rgba(236, 72, 153, 0.42), rgba(244, 114, 182, 0.28))",
     emoji: "💎",
     forGender: "female",
   },
@@ -141,7 +141,7 @@ export const hobbies = [
     title: "PC",
     subtitle: "Steam, builds, RGB, GPUs, and desk upgrades",
     cardGradient:
-      "linear-gradient(145deg, rgba(14, 165, 233, 0.2), rgba(99, 102, 241, 0.14))",
+      "linear-gradient(145deg, rgba(14, 165, 233, 0.4), rgba(99, 102, 241, 0.3))",
     emoji: "🖥️",
     forGender: "male",
   },
@@ -150,7 +150,7 @@ export const hobbies = [
     title: "Kids & play",
     subtitle: "Toys, games, creativity, and wonder",
     cardGradient:
-      "linear-gradient(145deg, rgba(251, 191, 36, 0.22), rgba(244, 114, 182, 0.14))",
+      "linear-gradient(145deg, rgba(251, 191, 36, 0.42), rgba(244, 114, 182, 0.28))",
     emoji: "🧸",
     forGender: null,
   },

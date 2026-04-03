@@ -892,6 +892,22 @@ export default function App() {
 
   const [locale, setLocale] = useState("en");
 
+  const [colorTheme, setColorTheme] = useState(() => {
+    if (typeof document === "undefined") return "dark";
+    const d = document.documentElement.dataset.theme;
+    return d === "light" || d === "dark" ? d : "dark";
+  });
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.dataset.theme = colorTheme;
+    try {
+      localStorage.setItem("gifted-theme", colorTheme);
+    } catch {
+      /* ignore */
+    }
+  }, [colorTheme]);
+
   useEffect(() => {
     if (typeof document !== "undefined") {
       const he = locale === "he";
@@ -1537,6 +1553,10 @@ export default function App() {
       const clone = JSON.parse(JSON.stringify(gift));
       return [...prev, { key: `like-${gift.id}-${Date.now()}`, gift: clone }];
     });
+    setDislikedIds((prev) => prev.filter((id) => id !== gift.id));
+    setDislikedEntries((prev) =>
+      prev.filter((e) => e.sourceId !== gift.id),
+    );
   }
 
   function removeLikedEntry(key) {
@@ -1544,6 +1564,7 @@ export default function App() {
   }
 
   function dislikeGift(giftId) {
+    setLikedEntries((prev) => prev.filter((e) => e.gift.id !== giftId));
     setDislikedIds((prev) =>
       prev.includes(giftId) ? prev : [...prev, giftId],
     );
@@ -2085,6 +2106,53 @@ export default function App() {
         </button>
         <div className="Header__actions">
           <div className="Header__actionsRow">
+            <div className="ThemeSwitch" dir="ltr">
+              <button
+                type="button"
+                className={`ThemeSwitch__btn${colorTheme === "light" ? " ThemeSwitch__btn--light" : " ThemeSwitch__btn--dark"}`}
+                onClick={() =>
+                  setColorTheme((prev) => (prev === "light" ? "dark" : "light"))
+                }
+                role="switch"
+                aria-checked={colorTheme === "dark"}
+                aria-label={t("theme_switch_aria")}
+              >
+                <span className="ThemeSwitch__thumb" aria-hidden />
+                <span className="ThemeSwitch__icons" aria-hidden>
+                  <span className="ThemeSwitch__iconWrap ThemeSwitch__iconWrap--sun">
+                    <svg
+                      className="ThemeSwitch__svg ThemeSwitch__svg--sun"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      aria-hidden
+                    >
+                      <path
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"
+                      />
+                    </svg>
+                  </span>
+                  <span className="ThemeSwitch__iconWrap ThemeSwitch__iconWrap--moon">
+                    <svg
+                      className="ThemeSwitch__svg ThemeSwitch__svg--moon"
+                      viewBox="0 0 24 24"
+                      aria-hidden
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"
+                      />
+                    </svg>
+                  </span>
+                </span>
+              </button>
+              <span className="visually-hidden">
+                {colorTheme === "light" ? t("theme_light") : t("theme_dark")}
+              </span>
+            </div>
             {pageMode === "privacy" ? (
               <button
                 type="button"
@@ -3191,7 +3259,7 @@ export default function App() {
                 <div className="ResultsToolbar">
                   <button
                     type="button"
-                    className="Btn Btn--secondary"
+                    className="Btn Btn--secondary ResultsToolbar__more"
                     onClick={() => void reloadSuggestions()}
                     disabled={isReloading}
                   >

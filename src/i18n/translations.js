@@ -7,6 +7,9 @@ const en = {
   lang_en: "English",
   lang_he: "Hebrew",
   lang_switch: "Language",
+  theme_switch_aria: "Switch between light and dark theme",
+  theme_light: "Light",
+  theme_dark: "Dark",
 
   tagline: "Gifting, made effortless",
   start_over: "Start over",
@@ -313,6 +316,9 @@ const he = {
   lang_en: "אנגלית",
   lang_he: "עברית",
   lang_switch: "שפה",
+  theme_switch_aria: "מעבר בין מצב בהיר וכהה",
+  theme_light: "בהיר",
+  theme_dark: "כהה",
 
   tagline: "מתנות, בלי מאמץ",
   start_over: "התחל מחדש",

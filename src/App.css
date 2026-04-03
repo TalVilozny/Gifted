@@ -11,9 +11,109 @@
   --radius-lg: 20px;
   --radius-md: 14px;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  --input-fill: rgba(0, 0, 0, 0.35);
+  --menu-surface: rgba(22, 22, 28, 0.98);
+  --subtle-text: #e4e4e7;
+  --footer-link: #d4d4d8;
+  --privacy-link: #e9d5ff;
+  --privacy-body: #d4d4d8;
+  /* Theme toggle: dark surface aligned with page chrome (default theme is dark) */
+  --theme-switch-track: #16181f;
+  --theme-switch-border: rgba(255, 255, 255, 0.1);
+  --theme-switch-border-hover: rgba(255, 255, 255, 0.22);
+  --theme-switch-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --theme-thumb: #2563eb;
+  --shell-glow-inner: rgba(139, 92, 246, 0.22);
+  --case-viewport-mid: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.35),
+    rgba(0, 0, 0, 0.55)
+  );
+  --gift-media-bg: rgba(0, 0, 0, 0.35);
+  --inline-code-bg: rgba(0, 0, 0, 0.35);
   font-family: "Inter", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f0f5fb;
+  --bg-elevated: rgba(240, 240, 240, 0.94);
+  --stroke: rgba(15, 23, 42, 0.1);
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #a16207;
+  --accent-soft: rgba(161, 98, 7, 0.12);
+  --accent-2: #6d28d9;
+  --danger-soft: rgba(245, 158, 11, 0.15);
+  --shadow: 0 24px 64px rgba(15, 23, 42, 0.08);
+  --input-fill: #f0f0f0;
+  --menu-surface: #f0f0f0;
+  --subtle-text: #334155;
+  --footer-link: #475569;
+  --privacy-link: #5b21b6;
+  --privacy-body: #475569;
+  --theme-switch-track: #f0f0f0;
+  --theme-switch-border: rgba(148, 163, 184, 0.45);
+  --theme-switch-border-hover: rgba(37, 99, 235, 0.4);
+  --theme-switch-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --theme-thumb: #2563eb;
+  --shell-glow-inner: rgba(99, 102, 241, 0.14);
+  --case-viewport-mid: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.95),
+    rgba(241, 245, 249, 0.98)
+  );
+  --gift-media-bg: #e2e8f0;
+  --inline-code-bg: #f1f5f9;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+html[data-theme="light"] .LangSelect__trigger {
+  background: #f0f0f0;
+  color: var(--text);
+  border-color: var(--stroke);
+}
+
+html[data-theme="light"] .LangSelect__trigger .LangSelect__triggerLabel {
+  color: var(--text);
+}
+
+html[data-theme="light"] .LangSelect__trigger:hover {
+  background: #e4e4e4;
+  border-color: rgba(99, 102, 241, 0.25);
+}
+
+html[data-theme="light"] .CaseViewport__inner::before {
+  background: linear-gradient(
+    90deg,
+    rgba(248, 250, 252, 0.98) 0%,
+    rgba(248, 250, 252, 0) 14%,
+    rgba(248, 250, 252, 0) 86%,
+    rgba(248, 250, 252, 0.98) 100%
+  );
+}
+
+html[data-theme="light"] .CaseViewport {
+  box-shadow: inset 0 2px 8px rgba(15, 23, 42, 0.07);
 }
 
 *,
@@ -67,7 +167,7 @@ h4 {
   height: 55vh;
   background: radial-gradient(
     ellipse at 50% 0%,
-    rgba(139, 92, 246, 0.22),
+    var(--shell-glow-inner),
     transparent 55%
   );
   pointer-events: none;
@@ -141,6 +241,109 @@ h4 {
   align-items: center;
 }
 
+/* Pill toggle: sun (light) left, moon (dark) right — dir=ltr on control */
+.ThemeSwitch {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ThemeSwitch__btn {
+  position: relative;
+  width: 3.5rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--theme-switch-border);
+  border-radius: 999px;
+  background: var(--theme-switch-track);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+  box-shadow: var(--theme-switch-shadow);
+}
+
+.ThemeSwitch__btn:hover {
+  border-color: var(--theme-switch-border-hover);
+}
+
+html[data-theme="dark"] .ThemeSwitch__btn:hover {
+  background: #1c1e28;
+}
+
+.ThemeSwitch__btn:focus-visible {
+  outline: 2px solid var(--theme-thumb);
+  outline-offset: 2px;
+}
+
+.ThemeSwitch__thumb {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 1.625rem;
+  height: 1.625rem;
+  margin-top: -0.8125rem;
+  border-radius: 50%;
+  background: var(--theme-thumb);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.ThemeSwitch__btn--dark .ThemeSwitch__thumb {
+  left: calc(100% - 3px - 1.625rem);
+}
+
+.ThemeSwitch__icons {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 0 0.42rem;
+  pointer-events: none;
+}
+
+.ThemeSwitch__iconWrap {
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.ThemeSwitch__svg--sun {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentColor;
+}
+
+.ThemeSwitch__svg--moon {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: currentColor;
+  stroke: none;
+}
+
+.ThemeSwitch__btn--light .ThemeSwitch__iconWrap--sun {
+  color: #f0f0f0;
+}
+
+.ThemeSwitch__btn--light .ThemeSwitch__iconWrap--moon {
+  color: #94a3b8;
+}
+
+.ThemeSwitch__btn--dark .ThemeSwitch__iconWrap--moon {
+  color: #f0f0f0;
+}
+
+.ThemeSwitch__btn--dark .ThemeSwitch__iconWrap--sun {
+  color: #94a3b8;
+}
+
 .LangSelect {
   position: relative;
   display: inline-block;
@@ -211,8 +414,12 @@ h4 {
   list-style: none;
   border: 1px solid var(--stroke);
   border-radius: 10px;
-  background: rgba(22, 22, 28, 0.98);
+  background: var(--menu-surface);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="light"] .LangSelect__menu {
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
 }
 
 .LangSelect__menuItem {
@@ -256,6 +463,7 @@ h4 {
 }
 
 .DislikesManager {
+  --dislikes-item-min-h: 60px;
   position: absolute;
   top: calc(100% + 0.35rem);
   inset-inline-end: 0;
@@ -280,6 +488,13 @@ h4 {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  /* Viewport fits exactly 2 rows; additional dislikes scroll inside */
+  max-height: calc(2 * var(--dislikes-item-min-h) + 1 * 0.45rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .DislikesManager__item {
@@ -288,13 +503,26 @@ h4 {
   align-items: center;
   gap: 0.65rem;
   padding: 0.5rem;
+  box-sizing: border-box;
+  min-height: var(--dislikes-item-min-h);
+  max-height: var(--dislikes-item-min-h);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
+  flex-shrink: 0;
+}
+
+.DislikesManager__meta {
+  min-width: 0;
+  flex: 1;
 }
 
 .DislikesManager__name {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-size: 0.85rem;
+  line-height: 1.35;
 }
 
 .DislikesManager__price {
@@ -303,7 +531,7 @@ h4 {
   color: var(--muted);
 }
 
-/* In-flow on small screens so the panel height reserves space and does not cover results */
+/* In-flow on small screens so the panel reserves space */
 @media (max-width: 720px) {
   .DislikesManager {
     position: relative;
@@ -354,7 +582,7 @@ h4 {
 }
 
 .Footer__link {
-  color: #d4d4d8;
+  color: var(--footer-link);
   text-decoration: none;
   width: fit-content;
   border-bottom: 1px solid transparent;
@@ -397,7 +625,7 @@ h4 {
   gap: 0.55rem;
   font-size: 0.95rem;
   line-height: 1.6;
-  color: #d4d4d8;
+  color: var(--privacy-body);
 }
 
 .PrivacyPage__content h3 {
@@ -412,7 +640,7 @@ h4 {
 }
 
 .PrivacyPage__content a {
-  color: #e9d5ff;
+  color: var(--privacy-link);
 }
 
 .Panel {
@@ -667,13 +895,34 @@ h4 {
   line-height: 1.45;
 }
 
+html[data-theme="light"] .AddHobby .Btn--secondary {
+  background: linear-gradient(
+    145deg,
+    rgba(217, 70, 239, 0.34),
+    rgba(124, 58, 237, 0.26)
+  );
+  border-color: var(--stroke);
+  color: #0a0a0a;
+  font-weight: 600;
+}
+
+html[data-theme="light"] .AddHobby .Btn--secondary:hover:not(:disabled) {
+  background: linear-gradient(
+    145deg,
+    rgba(217, 70, 239, 0.42),
+    rgba(124, 58, 237, 0.34)
+  );
+  border-color: var(--stroke);
+  color: #0a0a0a;
+}
+
 .Input {
   flex: 1;
   min-width: 200px;
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
   border: 1px solid var(--stroke);
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--input-fill);
   color: var(--text);
   font-size: 0.95rem;
 }
@@ -714,7 +963,7 @@ h4 {
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
   border: 1px solid var(--stroke);
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--input-fill);
   color: var(--text);
   font-size: 0.95rem;
   cursor: pointer;
@@ -764,7 +1013,7 @@ h4 {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   font-size: 0.92rem;
   line-height: 1.55;
-  color: #e4e4e7;
+  color: var(--subtle-text);
   cursor: pointer;
   user-select: none;
   transition:
@@ -787,7 +1036,7 @@ h4 {
   height: 20px;
   border-radius: 6px;
   border: 1.5px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--input-fill);
   cursor: pointer;
   flex-shrink: 0;
   margin-top: 0.2rem;
@@ -795,6 +1044,11 @@ h4 {
     border-color 0.2s,
     background 0.2s,
     box-shadow 0.2s;
+}
+
+html[data-theme="light"] .DIYToggle__checkbox,
+html[data-theme="light"] .BudgetUnlimited__checkbox {
+  border-color: rgba(15, 23, 42, 0.15);
 }
 
 .DIYToggle__checkbox:checked,
@@ -938,6 +1192,95 @@ h4 {
     0 0 0 4px rgba(12, 13, 18, 0.92);
 }
 
+/* Budget step — rich gold on light theme (SliderBlock / Range only here) */
+html[data-theme="light"] .SliderBlock__value {
+  color: #854d0e;
+}
+
+html[data-theme="light"] .BudgetUnlimited {
+  border-color: rgba(161, 98, 7, 0.52);
+  background: linear-gradient(
+    145deg,
+    rgba(201, 162, 39, 0.26) 0%,
+    rgba(201, 162, 39, 0.1) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+html[data-theme="light"] .BudgetUnlimited:hover {
+  border-color: rgba(133, 77, 14, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 0 1px rgba(201, 162, 39, 0.26);
+}
+
+/* Use background-color + background-image — a full `background` shorthand clears the checkmark SVG */
+html[data-theme="light"] .BudgetUnlimited__checkbox:checked {
+  background-color: #a16207;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 8' fill='none'%3E%3Cpath d='M1 3.5l3 3 5-5' stroke='%23f8fafc' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 60%;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-color: transparent;
+  box-shadow: 0 2px 12px rgba(201, 162, 39, 0.45);
+}
+
+html[data-theme="light"] .RangeWrap::before {
+  background: linear-gradient(
+    90deg,
+    rgba(201, 162, 39, 0.92) 0%,
+    rgba(180, 130, 40, 0.78) var(--pct),
+    rgba(226, 232, 240, 0.95) var(--pct),
+    rgba(241, 245, 249, 0.98) 100%
+  );
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="light"] .RangeWrap::after {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme="light"] .Range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 3px rgba(201, 162, 39, 0.45),
+    0 6px 22px rgba(201, 162, 39, 0.42),
+    0 0 0 5px rgba(240, 245, 251, 0.98);
+}
+
+html[data-theme="light"] .Range::-webkit-slider-thumb {
+  background: linear-gradient(160deg, #fff6cc 0%, #e8c547 38%, #a16207 100%);
+  border: 1px solid rgba(161, 98, 7, 0.55);
+  box-shadow:
+    0 6px 20px rgba(201, 162, 39, 0.52),
+    0 0 0 4px rgba(240, 245, 251, 0.98);
+}
+
+html[data-theme="light"] .Range:hover::-webkit-slider-thumb {
+  box-shadow:
+    0 8px 26px rgba(201, 162, 39, 0.58),
+    0 0 0 4px rgba(240, 245, 251, 0.98);
+}
+
+html[data-theme="light"] .Range::-moz-range-thumb {
+  background: linear-gradient(160deg, #fff6cc 0%, #e8c547 38%, #a16207 100%);
+  border: 1px solid rgba(161, 98, 7, 0.55);
+  box-shadow:
+    0 6px 20px rgba(201, 162, 39, 0.52),
+    0 0 0 4px rgba(240, 245, 251, 0.98);
+}
+
+html[data-theme="light"] .Range:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 3px rgba(201, 162, 39, 0.45),
+    0 6px 22px rgba(201, 162, 39, 0.42),
+    0 0 0 5px rgba(240, 245, 251, 0.98);
+}
+
+html[data-theme="light"] .Recap {
+  background: rgba(201, 162, 39, 0.14);
+  border-color: rgba(161, 98, 7, 0.4);
+}
+
 .SliderBlock__ticks {
   display: flex;
   justify-content: space-between;
@@ -953,7 +1296,7 @@ h4 {
   background: var(--accent-soft);
   border: 1px solid rgba(201, 162, 39, 0.2);
   font-size: 0.95rem;
-  color: #e4e4e7;
+  color: var(--subtle-text);
 }
 
 .Btn {
@@ -1010,9 +1353,18 @@ h4 {
   border-color: rgba(139, 92, 246, 0.55);
 }
 
+html[data-theme="light"] .RefineBlock .Btn--secondary {
+  color: #0a0a0a;
+}
+
+html[data-theme="light"] .RefineBlock .Btn--secondary:hover:not(:disabled) {
+  color: #0a0a0a;
+}
+
 .Btn--small {
   padding: 0.45rem 0.95rem;
   font-size: 0.82rem;
+  white-space: nowrap;
 }
 
 .Btn--small:disabled {
@@ -1124,7 +1476,7 @@ h4 {
 .GiftCard__media {
   position: relative;
   min-height: 200px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--gift-media-bg);
 }
 
 .GiftCard__media .GiftCard__ribbon {
@@ -1202,7 +1554,7 @@ h4 {
   margin: 0.35rem 0 0;
   font-size: 0.82rem;
   line-height: 1.45;
-  color: #e4e4e7;
+  color: var(--subtle-text);
   padding: 0.5rem 0.65rem;
   border-radius: 8px;
   background: rgba(99, 102, 241, 0.12);
@@ -1220,7 +1572,7 @@ h4 {
   font-size: 0.85em;
   padding: 0.12rem 0.35rem;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--inline-code-bg);
   border: 1px solid var(--stroke);
   font-family: ui-monospace, monospace;
 }
@@ -1271,6 +1623,27 @@ h4 {
   cursor: wait;
 }
 
+html[data-theme="light"] .Btn--want {
+  background: linear-gradient(
+    135deg,
+    rgba(209, 250, 229, 0.98),
+    rgba(167, 243, 208, 0.92)
+  );
+  border-color: rgba(16, 185, 129, 0.42);
+  color: #0a0a0a;
+}
+
+html[data-theme="light"] .Btn--want:hover:not(:disabled) {
+  filter: none;
+  background: linear-gradient(
+    135deg,
+    rgba(204, 251, 241, 1),
+    rgba(153, 246, 228, 0.95)
+  );
+  border-color: rgba(5, 150, 105, 0.5);
+  color: #0a0a0a;
+}
+
 .GiftCard__wantHint {
   margin: 0.45rem 0 0;
   font-size: 0.78rem;
@@ -1319,7 +1692,7 @@ h4 {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.28);
-  color: #e4e4e7;
+  color: var(--subtle-text);
   text-decoration: none;
   transition:
     border-color 0.2s,
@@ -1331,6 +1704,19 @@ h4 {
   border-color: rgba(201, 162, 39, 0.45);
   background: rgba(201, 162, 39, 0.1);
   color: #fafafa;
+}
+
+html[data-theme="light"] .RetailerLink {
+  border-color: var(--stroke);
+  background: rgba(255, 255, 255, 0.96);
+  color: #0a0a0a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+html[data-theme="light"] .RetailerLink:hover {
+  border-color: rgba(201, 162, 39, 0.48);
+  background: #fffbeb;
+  color: #0a0a0a;
 }
 
 .GiftCard__name {
@@ -1455,6 +1841,24 @@ h4 {
   color: #d4d4d8;
 }
 
+html[data-theme="light"] .Review {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: var(--stroke);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html[data-theme="light"] .Review__author {
+  color: #334155;
+}
+
+html[data-theme="light"] .Review__text {
+  color: #0a0a0a;
+}
+
+html[data-theme="light"] .Reviews__disclaimer {
+  color: #475569;
+}
+
 .DIYToggle {
   margin-top: 1.5rem;
   margin-bottom: 0.25rem;
@@ -1525,10 +1929,19 @@ h4 {
   height: 60px;
 }
 
+/* Light mode: black silhouettes (invert() skewed hues to cyan) */
+html[data-theme="light"] .GiftedIcon {
+  filter: brightness(0);
+}
+
 .GiftedText img {
   height: 25px;
   width: fit-content;
   filter: brightness(0) invert(1);
+}
+
+html[data-theme="light"] .GiftedText img {
+  filter: brightness(0);
 }
 
 .GiftedText {
@@ -1726,7 +2139,11 @@ h4 {
   padding: 0.9rem 1rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--stroke);
-  background: rgba(0, 0, 0, 0.25);
+  background: linear-gradient(
+    155deg,
+    rgba(99, 102, 241, 0.07),
+    rgba(24, 22, 40, 0.32)
+  );
   cursor: pointer;
   text-align: start;
   font: inherit;
@@ -1737,6 +2154,14 @@ h4 {
     box-shadow 0.2s;
 }
 
+html[data-theme="light"] .GiftPrefCard {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.42),
+    rgba(230, 240, 255, 0.32)
+  );
+}
+
 .GiftPrefCard:hover {
   border-color: rgba(201, 162, 39, 0.35);
 }
@@ -1745,6 +2170,15 @@ h4 {
   border-color: rgba(201, 162, 39, 0.55);
   background: rgba(201, 162, 39, 0.1);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html[data-theme="light"] .GiftPrefCard--selected {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 252, 245, 0.98),
+    rgba(254, 236, 200, 0.55)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .GiftPrefCard:focus-visible {
@@ -1786,6 +2220,10 @@ h4 {
   gap: 0.65rem;
   align-items: center;
   margin-bottom: 1.25rem;
+}
+
+html[data-theme="light"] .ResultsToolbar__more {
+  color: #0a0a0a;
 }
 
 .HobbyFilter {
@@ -1894,7 +2332,7 @@ h4 {
 .LikedSection__name {
   display: block;
   font-weight: 500;
-  color: #e4e4e7;
+  color: var(--subtle-text);
 }
 
 .LikedSection__price {
@@ -1939,6 +2377,12 @@ h4 {
   border-color: rgba(201, 162, 39, 0.4);
 }
 
+.VoteBtn--like:hover:not(.VoteBtn--on) {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.22);
+  color: #dcfce7;
+}
+
 .VoteBtn--like.VoteBtn--on {
   border-color: rgba(34, 197, 94, 0.55);
   background: rgba(34, 197, 94, 0.12);
@@ -1953,6 +2397,60 @@ h4 {
 .VoteBtn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+html[data-theme="light"] .VoteBtn {
+  border-color: var(--stroke);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html[data-theme="light"] .VoteBtn:hover {
+  background: #ffffff;
+  border-color: rgba(201, 162, 39, 0.42);
+}
+
+html[data-theme="light"] .VoteBtn--like:hover:not(.VoteBtn--on) {
+  border-color: rgba(22, 163, 74, 0.48);
+  background: linear-gradient(
+    165deg,
+    rgba(220, 252, 231, 0.98),
+    rgba(187, 247, 208, 0.85)
+  );
+  color: #14532d;
+  box-shadow: 0 1px 2px rgba(22, 101, 52, 0.08);
+}
+
+html[data-theme="light"] .VoteBtn--like.VoteBtn--on {
+  border-color: rgba(22, 163, 74, 0.5);
+  background: linear-gradient(
+    165deg,
+    rgba(240, 253, 244, 0.98),
+    rgba(220, 252, 231, 0.95)
+  );
+  color: #14532d;
+  box-shadow: 0 1px 2px rgba(22, 101, 52, 0.08);
+}
+
+html[data-theme="light"] .VoteBtn--like.VoteBtn--on:hover {
+  border-color: rgba(22, 163, 74, 0.62);
+  background: linear-gradient(
+    165deg,
+    rgba(236, 253, 245, 1),
+    rgba(209, 250, 229, 0.98)
+  );
+  color: #14532d;
+}
+
+html[data-theme="light"] .VoteBtn--dislike:hover {
+  border-color: rgba(220, 38, 38, 0.38);
+  background: linear-gradient(
+    165deg,
+    rgba(254, 242, 242, 0.98),
+    rgba(254, 226, 226, 0.92)
+  );
+  color: #7f1d1d;
 }
 
 /* --- Pick-for-me modal (horizontal scroll strip) --- */
@@ -2024,7 +2522,7 @@ h4 {
   margin: 0 0 1.1rem;
   border-radius: var(--radius-md);
   border: 1px solid rgba(201, 162, 39, 0.28);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55));
+  background: var(--case-viewport-mid);
   overflow: hidden;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
   /* Strip translateX math assumes LTR flex; page RTL would reverse flex and hide items */
@@ -2136,7 +2634,7 @@ h4 {
   font-size: 0.8rem;
   line-height: 1.3;
   text-align: center;
-  color: #e4e4e7;
+  color: var(--subtle-text);
   display: -webkit-box;
   line-clamp: 3;
   -webkit-line-clamp: 3;
@@ -2192,6 +2690,72 @@ h4 {
   margin-bottom: 0.35rem;
 }
 
+html[data-theme="light"] .CaseModal__backdrop {
+  background: rgba(15, 23, 42, 0.38);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="light"] .CaseModal__backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(15, 23, 42, 0.55);
+  }
+}
+
+html[data-theme="light"] .CaseModal__panel {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.99),
+    rgba(248, 250, 252, 0.98)
+  );
+  border-color: var(--stroke);
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  color: var(--text);
+}
+
+html[data-theme="light"] .CaseStrip__item {
+  border-inline-end-color: rgba(15, 23, 42, 0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(241, 245, 249, 0.94)
+  );
+}
+
+html[data-theme="light"] .CaseStrip__item:nth-child(odd) {
+  background: linear-gradient(
+    180deg,
+    rgba(237, 233, 254, 0.75),
+    rgba(241, 245, 249, 0.96)
+  );
+}
+
+html[data-theme="light"] .CaseStrip__name {
+  color: var(--text);
+}
+
+html[data-theme="light"] .CaseViewport__glow--left {
+  background: linear-gradient(90deg, rgba(201, 162, 39, 0.2), transparent);
+}
+
+html[data-theme="light"] .CaseViewport__glow--right {
+  background: linear-gradient(270deg, rgba(139, 92, 246, 0.16), transparent);
+}
+
+html[data-theme="light"] .CaseModal__winner {
+  background: rgba(201, 162, 39, 0.12);
+  border-color: rgba(161, 98, 7, 0.32);
+  color: var(--text);
+}
+
+html[data-theme="light"] .CaseViewport__marker {
+  box-shadow:
+    0 0 16px rgba(201, 162, 39, 0.35),
+    0 0 2px rgba(15, 23, 42, 0.15);
+}
+
 @media (max-width: 720px) {
   .GiftCard {
     grid-template-columns: 1fr;
@@ -2212,8 +2776,16 @@ h4 {
 
   .Header__actions {
     margin-top: 20px;
-    flex-direction: row;
-    align-items: center;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .Header__actionsRow {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
   }
 
   .Btn--ghost {
