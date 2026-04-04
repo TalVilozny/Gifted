@@ -1,5 +1,7 @@
 # Tal Vilozny – Gifted 🎁
 
+![Tal Vilozny Gifted Preview](./public/GiftedThumbnail.png)
+
 A modern, intelligent gift-finding web app that helps you discover the perfect present based on who you're buying for.
 
 Gifted simplifies the gifting process by generating personalized recommendations using inputs like age, interests, and relationship—while allowing you to refine suggestions and explore better matches in seconds.
