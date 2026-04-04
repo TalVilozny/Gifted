@@ -8,7 +8,7 @@ Gifted simplifies the gifting process by generating personalized recommendations
 
 ---
 
-## 🚀 Live Demo
+## 🚀 Find a gift!
 
 👉 https://getgifted.vercel.app
 
@@ -70,5 +70,6 @@ If you’d like to connect, collaborate, or give feedback:
 
 - Linkedin: https://www.linkedin.com/in/tal-vilozny-frontend/
 - Portfolio: https://talvilozny.vercel.app
+- Gmail: TalVilozny@gmail.com
 
 ---
