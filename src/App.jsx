@@ -33,12 +33,34 @@ import { fetchPexelsImageUrl, isPexelsConfigured } from "./lib/pexelsImages.js";
 import { isGroqConfigured, refineWithGroq } from "./lib/groqRefine.js";
 import "./App.css";
 
+/** Slider / number-input step in display-currency units (rough UX by currency scale). */
+function budgetSliderStep(currency, maxInCurrency) {
+  if (currency === "JPY") {
+    return maxInCurrency > 200_000
+      ? 5_000
+      : maxInCurrency > 50_000
+        ? 1_000
+        : 500;
+  }
+  if (currency === "INR") {
+    return maxInCurrency > 200_000
+      ? 2_000
+      : maxInCurrency > 50_000
+        ? 500
+        : 100;
+  }
+  if (currency === "ILS") return 20;
+  if (currency === "BRL") return maxInCurrency > 5000 ? 50 : 20;
+  return maxInCurrency > 5000 ? 25 : 10;
+}
+
 function formatMoney(amount, code) {
   try {
+    const maxFrac = code === "ILS" || code === "JPY" ? 0 : 2;
     return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency: code,
-      maximumFractionDigits: code === "ILS" ? 0 : 2,
+      maximumFractionDigits: maxFrac,
     }).format(amount);
   } catch {
     return `${amount.toFixed(2)} ${code}`;
@@ -2999,9 +3021,7 @@ export default function App() {
                       dir={locale === "he" ? "rtl" : "ltr"}
                       min={budgetMinDisplay}
                       max={maxDisplay}
-                      step={
-                        currency === "ILS" ? 20 : maxDisplay > 5000 ? 25 : 10
-                      }
+                      step={budgetSliderStep(currency, maxDisplay)}
                       value={budgetInCurrency}
                       onChange={(e) => setBudgetSlider(Number(e.target.value))}
                       disabled={budgetUnlimited}
@@ -3031,7 +3051,7 @@ export default function App() {
                     className="Input BudgetInputRow__input"
                     min={0}
                     max={maxDisplay}
-                    step={currency === "ILS" ? 20 : maxDisplay > 5000 ? 25 : 10}
+                    step={budgetSliderStep(currency, maxDisplay)}
                     disabled={budgetUnlimited}
                     value={budgetUnlimited ? "" : budgetAmountText}
                     onChange={(e) => {
@@ -3095,13 +3115,10 @@ export default function App() {
                             dir={locale === "he" ? "rtl" : "ltr"}
                             min={0}
                             max={Math.max(0, budgetInCurrency)}
-                            step={
-                              currency === "ILS"
-                                ? 20
-                                : budgetInCurrency > 5000
-                                  ? 25
-                                  : 10
-                            }
+                            step={budgetSliderStep(
+                              currency,
+                              Math.max(0, budgetInCurrency),
+                            )}
                             value={Math.min(budgetMinSlider, budgetInCurrency)}
                             onChange={(e) =>
                               setBudgetMinSlider(

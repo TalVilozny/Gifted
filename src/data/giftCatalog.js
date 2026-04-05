@@ -6,19 +6,30 @@ import {
   pickBestVariantForBudgetScored,
 } from "./productEngine.js";
 
+/** Display order: USD first, ILS second, then others (matches all `SHOP_COUNTRIES` currencies). */
 export const CURRENCIES = [
   { code: "USD", label: "US Dollar", symbol: "$" },
+  { code: "ILS", label: "Israeli Shekel", symbol: "₪" },
+  { code: "AUD", label: "Australian Dollar", symbol: "A$" },
+  { code: "BRL", label: "Brazilian Real", symbol: "R$" },
+  { code: "CAD", label: "Canadian Dollar", symbol: "CA$" },
   { code: "EUR", label: "Euro", symbol: "€" },
   { code: "GBP", label: "British Pound", symbol: "£" },
-  { code: "ILS", label: "Israeli Shekel", symbol: "₪" },
+  { code: "INR", label: "Indian Rupee", symbol: "₹" },
+  { code: "JPY", label: "Japanese Yen", symbol: "¥" },
 ];
 
 /** Multiply USD amount by this to get amount in selected currency (approximate). */
 export const USD_TO = {
   USD: 1,
+  ILS: 3.65,
+  AUD: 1.56,
+  BRL: 5.7,
+  CAD: 1.44,
   EUR: 0.93,
   GBP: 0.79,
-  ILS: 3.65,
+  INR: 85,
+  JPY: 155,
 };
 
 export function usdToCurrency(usd, code) {

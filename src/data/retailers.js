@@ -8,6 +8,12 @@ export const SHOP_COUNTRIES = [
     sheinHost: "www.shein.com",
   },
   {
+    code: "IL",
+    label: "Israel",
+    amazonHost: "www.amazon.com",
+    sheinHost: "il.shein.com",
+  },
+  {
     code: "GB",
     label: "United Kingdom",
     amazonHost: "www.amazon.co.uk",
@@ -24,12 +30,6 @@ export const SHOP_COUNTRIES = [
     label: "France",
     amazonHost: "www.amazon.fr",
     sheinHost: "fr.shein.com",
-  },
-  {
-    code: "IL",
-    label: "Israel",
-    amazonHost: "www.amazon.com",
-    sheinHost: "il.shein.com",
   },
   {
     code: "CA",
