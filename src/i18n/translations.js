@@ -367,7 +367,7 @@ const he = {
   back: "חזרה",
   continue: "המשך",
 
-  rel_boyfriend_label: "בן זוג (גבר)",
+  rel_boyfriend_label: "בן זוג",
   rel_boyfriend_hint: "זוגיות",
   rel_girlfriend_label: "בת זוג",
   rel_girlfriend_hint: "זוגיות",

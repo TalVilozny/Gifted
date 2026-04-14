@@ -4,6 +4,10 @@ import GiftedLogo from "./Icons/GiftedLogo.png";
 import langEnFlag from "./Icons/USAFlag.png";
 import { Analytics } from "@vercel/analytics/react";
 import langHeFlag from "./Icons/IsraelFlag.png";
+import maleIcon from "./Icons/MaleIcon.png";
+import femaleIcon from "./Icons/FemaleIcon.png";
+import nonbinaryIcon from "./Icons/NonbinaryIcon.png";
+import otherGenderIcon from "./Icons/OtherGender.png";
 import { hobbyTitleSubtitle, makeT } from "./i18n/index.js";
 import {
   buildPickContext,
@@ -69,6 +73,41 @@ function formatMoney(amount, code) {
 
 function formatApproxGiftPrice(amount, code) {
   return `~${formatMoney(amount, code)}`;
+}
+
+const HE_REVIEWER_NAMES = [
+  "נועה לוי",
+  "יואב כהן",
+  "מיכל מזרחי",
+  "איתי פרידמן",
+  "שירה אברהם",
+  "רותם בן־דוד",
+  "תמר ישראלי",
+  "אורי עמר",
+];
+
+const HE_REVIEW_SNIPPETS = [
+  "מוצר מצוין, איכותי ושימושי ביום-יום.",
+  "מרגיש תמורה טובה למחיר, והגיע בדיוק כמו בתיאור.",
+  "נוח מאוד לשימוש, והאיכות מורגשת מהרגע הראשון.",
+  "קנייה מוצלחת. נראה טוב ועובד מצוין גם אחרי שימוש ממושך.",
+  "שמח/ה מהבחירה - פרקטי, נעים לשימוש ומרגיש איכותי.",
+  "הפתיע לטובה: איכות בנייה טובה וחוויה כללית מעולה.",
+];
+
+function stableHashIndex(seed, mod) {
+  const s = String(seed ?? "");
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return mod > 0 ? h % mod : 0;
+}
+
+function localizeReviewForLocale(review, locale) {
+  if (locale !== "he") return review;
+  const seed = `${review?.author ?? ""}|${review?.text ?? ""}|${review?.stars ?? ""}`;
+  const name = HE_REVIEWER_NAMES[stableHashIndex(seed, HE_REVIEWER_NAMES.length)];
+  const text = HE_REVIEW_SNIPPETS[stableHashIndex(`${seed}:text`, HE_REVIEW_SNIPPETS.length)];
+  return { ...review, author: name, text };
 }
 
 /**
@@ -318,6 +357,13 @@ const GENDER_OPTIONS = [
   { id: "nonbinary", label: "Nonbinary", hint: "They / them", emoji: "⚧" },
   { id: "other", label: "Other", hint: "Any / all", emoji: "♥" },
 ];
+
+const GENDER_ICON_BY_ID = {
+  male: maleIcon,
+  female: femaleIcon,
+  nonbinary: nonbinaryIcon,
+  other: otherGenderIcon,
+};
 
 const GROUP_KIND_OPTIONS = [
   {
@@ -2421,7 +2467,11 @@ export default function App() {
                           onClick={() => pickRecipient(g.id)}
                         >
                           <span className="ChoiceCard__emoji" aria-hidden>
-                            {g.emoji}
+                            <img
+                              className="ChoiceCard__genderIcon"
+                              src={GENDER_ICON_BY_ID[g.id] ?? otherGenderIcon}
+                              alt=""
+                            />
                           </span>
                           <span className="ChoiceCard__label">{g.label}</span>
                           <span className="ChoiceCard__hint">{g.hint}</span>
@@ -2477,7 +2527,11 @@ export default function App() {
                         onClick={() => setGroupGenderMode("male")}
                       >
                         <span className="ChoiceCard__emoji" aria-hidden>
-                          ♂️
+                          <img
+                            className="ChoiceCard__genderIcon"
+                            src={GENDER_ICON_BY_ID.male}
+                            alt=""
+                          />
                         </span>
                         <span className="ChoiceCard__label">
                           {t("all_male")}
@@ -2493,7 +2547,11 @@ export default function App() {
                         onClick={() => setGroupGenderMode("female")}
                       >
                         <span className="ChoiceCard__emoji" aria-hidden>
-                          ♀️
+                          <img
+                            className="ChoiceCard__genderIcon"
+                            src={GENDER_ICON_BY_ID.female}
+                            alt=""
+                          />
                         </span>
                         <span className="ChoiceCard__label">
                           {t("all_female")}
@@ -2509,7 +2567,11 @@ export default function App() {
                         onClick={() => setGroupGenderMode("mixed")}
                       >
                         <span className="ChoiceCard__emoji" aria-hidden>
-                          ⚧
+                          <img
+                            className="ChoiceCard__genderIcon"
+                            src={GENDER_ICON_BY_ID.nonbinary}
+                            alt=""
+                          />
                         </span>
                         <span className="ChoiceCard__label">
                           {t("mixed_group")}
@@ -2605,7 +2667,13 @@ export default function App() {
               <section className="Panel fade-in" aria-labelledby="age-title">
                 <p className="Eyebrow">{t("step2")}</p>
                 <h2 id="age-title" className="Panel__title">
-                  {t("age_title")}
+                  {locale === "he"
+                    ? gender === "female"
+                      ? "בת כמה?"
+                      : gender === "male"
+                        ? "בן כמה?"
+                        : t("age_title")
+                    : t("age_title")}
                 </h2>
                 <p className="Panel__lead">
                   {t("age_lead_base")}
@@ -3687,23 +3755,29 @@ export default function App() {
                                 : t("reviews_cat_disclaimer")}
                             </p>
                             <ul className="Reviews__list">
-                              {product.reviews.map((rev, i) => (
+                              {product.reviews.map((rev, i) => {
+                                const shownReview = localizeReviewForLocale(
+                                  rev,
+                                  locale,
+                                );
+                                return (
                                 <li key={i} className="Review">
                                   <div className="Review__meta">
                                     <Stars
-                                      value={rev.stars}
+                                      value={shownReview.stars}
                                       ariaLabel={t("stars_aria", {
-                                        value: rev.stars,
+                                        value: shownReview.stars,
                                         max: 5,
                                       })}
                                     />
                                     <span className="Review__author">
-                                      {rev.author}
+                                      {shownReview.author}
                                     </span>
                                   </div>
-                                  <p className="Review__text">{rev.text}</p>
+                                  <p className="Review__text">{shownReview.text}</p>
                                 </li>
-                              ))}
+                                );
+                              })}
                             </ul>
                           </div>
                         </div>

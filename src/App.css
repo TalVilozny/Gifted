@@ -892,6 +892,17 @@ html[data-theme="light"] .LangSelect__menu {
   line-height: 1;
 }
 
+.ChoiceCard__genderIcon {
+  width: 1.65rem;
+  height: 1.65rem;
+  object-fit: contain;
+  display: block;
+}
+
+html[data-theme="dark"] .ChoiceCard__genderIcon {
+  filter: brightness(0) invert(1);
+}
+
 .ChoiceCard__label {
   font-size: 1.2rem;
   font-family: var(--font-display);
