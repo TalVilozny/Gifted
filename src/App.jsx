@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import GiftedLight from "./Icons/GiftedLight.svg";
 import GiftedLogo from "./Icons/GiftedLogo.png";
 import langEnFlag from "./Icons/USAFlag.png";
@@ -901,7 +902,23 @@ function ProductImage({ searchQuery, fallbackSrc, usePexels = true }) {
 
 export default function App() {
   const [pageMode, setPageMode] = useState(getPageFromLocation);
-  const [step, setStep] = useState("who");
+  const [step, setStepState] = useState("who");
+
+  const setStep = useCallback((next) => {
+    setStepState((current) => {
+      if (current === next) return current;
+      if (
+        typeof document !== "undefined" &&
+        typeof document.startViewTransition === "function"
+      ) {
+        document.startViewTransition(() => {
+          flushSync(() => setStepState(next));
+        });
+        return current;
+      }
+      return next;
+    });
+  }, []);
   const [audienceMode, setAudienceMode] = useState(null);
   const [recipientId, setRecipientId] = useState(null);
   /** Age in years (constrained by relationship — see `ageLimits`). */
@@ -1186,9 +1203,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Keep each step/page transition starting at the top.
+    // Instant scroll on step change so fade / view transitions stay visible (smooth scroll fights the motion).
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [step]);
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [step, pageMode]);
+  }, [pageMode]);
 
   function cancelBudgetRangeAnimation() {
     if (budgetAnimateRafRef.current != null) {
@@ -1238,10 +1259,6 @@ export default function App() {
     setStep("age");
   }
 
-  function scrollToTopNow() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
   function pickGroup(kindId, composition) {
     setGroupKindId(kindId);
     setGroupGenderMode(composition);
@@ -1249,7 +1266,6 @@ export default function App() {
     setRecipientId(recipient);
     const lim = ageLimitsForRecipient(recipient);
     setRecipientAgeYears(Math.min(lim.max, Math.max(lim.min, 25)));
-    scrollToTopNow();
     setStep("age");
   }
 
@@ -1273,12 +1289,10 @@ export default function App() {
   }, [recipientAgeYears, ageLimits.min, ageLimits.max]);
 
   function continueFromAge() {
-    scrollToTopNow();
     setStep("passion");
   }
 
   function continueFromPassion() {
-    scrollToTopNow();
     setStep("budget");
   }
 
@@ -2391,9 +2405,9 @@ export default function App() {
             </div>
           </section>
         ) : (
-          <>
+          <div className="Main__step" key={step}>
             {step === "who" && (
-              <section className="Panel fade-in" aria-labelledby="who-title">
+              <section className="Panel" aria-labelledby="who-title">
                 <p className="Eyebrow">{t("step1")}</p>
                 <h2 id="who-title" className="Panel__title">
                   {t("who_title")}
@@ -2664,7 +2678,7 @@ export default function App() {
             )}
 
             {step === "age" && (
-              <section className="Panel fade-in" aria-labelledby="age-title">
+              <section className="Panel" aria-labelledby="age-title">
                 <p className="Eyebrow">{t("step2")}</p>
                 <h2 id="age-title" className="Panel__title">
                   {locale === "he"
@@ -2790,7 +2804,7 @@ export default function App() {
 
             {step === "passion" && (
               <section
-                className="Panel fade-in"
+                className="Panel"
                 aria-labelledby="passion-title"
               >
                 <p className="Eyebrow">{t("step3")}</p>
@@ -2986,7 +3000,7 @@ export default function App() {
             )}
 
             {step === "budget" && (
-              <section className="Panel fade-in" aria-labelledby="budget-title">
+              <section className="Panel" aria-labelledby="budget-title">
                 <p className="Eyebrow">{t("step4")}</p>
                 <h2 id="budget-title" className="Panel__title">
                   {t("budget_title")}
@@ -3304,7 +3318,7 @@ export default function App() {
             )}
 
             {step === "thinking" && (
-              <section className="Thinking fade-in" aria-live="polite">
+              <section className="Thinking" aria-live="polite">
                 <div className="Thinking__orb" aria-hidden />
                 <h2 className="Thinking__title">{t("thinking_title")}</h2>
                 <p className="Thinking__text">
@@ -3319,7 +3333,7 @@ export default function App() {
 
             {step === "results" && result && (
               <section
-                className="Results fade-in"
+                className="Results"
                 aria-labelledby="results-title"
               >
                 <h2 id="results-title" className="Panel__title">
@@ -3951,7 +3965,7 @@ export default function App() {
                 </div>
               </section>
             )}
-          </>
+          </div>
         )}
       </main>
 

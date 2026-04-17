@@ -670,6 +670,42 @@ html[data-theme="light"] .LangSelect__menu {
   flex: 1;
 }
 
+/* Step flow (who → age → …): named layer for View Transitions API + CSS fallback */
+.Main__step {
+  view-transition-name: gift-step;
+  animation: mainStepEnter 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes mainStepEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+::view-transition-old(gift-step),
+::view-transition-new(gift-step) {
+  animation-duration: 0.55s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .Main__step {
+    animation: none;
+    view-transition-name: none;
+  }
+
+  ::view-transition-old(gift-step),
+  ::view-transition-new(gift-step) {
+    animation-duration: 0.01ms;
+  }
+}
+
 .Footer {
   margin-top: 3rem;
   padding-top: 1.5rem;
